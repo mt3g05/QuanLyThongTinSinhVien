@@ -34,7 +34,7 @@ const adminNavItems = [
 
 
   { title: "Khoa & Ngành", href: "/admin/departments", icon: Building },
-  { title: "Khóa học", href: "/admin/cohorts", icon: BookOpen },
+  { title: "Môn học", href: "/admin/courses", icon: BookOpen },
   { title: "Cài đặt", href: "/admin/settings", icon: Settings },
 ]
 
@@ -44,6 +44,11 @@ const studentNavItems = [
   { title: "Kết quả học tập", href: "/student/grades", icon: FileText },
   { title: "Học phí", href: "/student/tuition", icon: CreditCard },
   { title: "Thông báo", href: "/student/notifications", icon: Bell },
+]
+
+const instructorNavItems = [
+  { title: "Lớp học phần", href: "/instructor/courses", icon: BookOpen },
+  { title: "Quản lý điểm", href: "/instructor/grades", icon: ClipboardList },
 ]
 
 export function SidebarNav({ role }) {
@@ -71,16 +76,18 @@ export function SidebarNav({ role }) {
       return () => clearInterval(interval);
     }
   }, [role]);
-  const navItems = role === "admin" ? adminNavItems : studentNavItems
+  const navItems = role === "admin" ? adminNavItems : role === "instructor" ? instructorNavItems : studentNavItems
   
   const userInfo = user 
     ? { 
-        name: user.name, 
-        email: user.email || (role === "admin" ? "admin@ptit.edu.vn" : `${user.studentId?.toLowerCase()}@ptit.edu.vn`),
-        avatar: user.name.split(" ").pop()?.charAt(0).toUpperCase() || "U"
+        name: user.name || user.full_name || user.username, 
+        email: user.email || (role === "admin" ? "admin@ptit.edu.vn" : role === "instructor" ? `${user.username?.toLowerCase()}@ptit.edu.vn` : `${user.studentId?.toLowerCase()}@ptit.edu.vn`),
+        avatar: (user.name || user.full_name || user.username || "U").split(" ").pop()?.charAt(0).toUpperCase() || "U"
       }
     : role === "admin" 
       ? { name: "Admin PTIT", email: "admin@ptit.edu.vn", avatar: "AD" }
+      : role === "instructor"
+      ? { name: "Giảng viên", email: "gv@ptit.edu.vn", avatar: "GV" }
       : { name: "Nguyễn Văn A", email: "b21dccn001@ptit.edu.vn", avatar: "NA" }
 
   const handleLogoutClick = () => {
@@ -94,7 +101,7 @@ export function SidebarNav({ role }) {
   return (
     <aside className="sidebar">
       {/* Logo */}
-      <Link href={role === "admin" ? "/admin" : "/student"} className="sidebar-header" style={{ textDecoration: 'none' }}>
+      <Link href={role === "admin" ? "/admin" : role === "instructor" ? "/instructor" : "/student"} className="sidebar-header" style={{ textDecoration: 'none' }}>
         <div className="sidebar-logo">PTIT</div>
         <div className="sidebar-brand">
           <span className="sidebar-brand-name">PTIT</span>

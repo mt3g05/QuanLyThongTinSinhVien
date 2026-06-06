@@ -50,6 +50,8 @@ export default function LoginPage() {
       
       if (user.role === "admin") {
         router.push("/admin")
+      } else if (user.role === "instructor") {
+        router.push("/instructor")
       } else {
         router.push("/student")
       }
@@ -90,6 +92,8 @@ export default function LoginPage() {
       
       if (user.role === "admin") {
         router.push("/admin")
+      } else if (user.role === "instructor") {
+        router.push("/instructor")
       } else {
         router.push("/student")
       }

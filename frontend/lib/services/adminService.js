@@ -40,6 +40,12 @@ export var adminStudentService = {
   importExcel: function (formData) {
     return apiClient.postFormData('/admin/students/import', formData);
   },
+  approve: function (id) {
+    return apiClient.put('/admin/students/' + id + '/approve');
+  },
+  approveAll: function () {
+    return apiClient.post('/admin/students/approve-all');
+  },
 };
 
 // ===== Instructors =====

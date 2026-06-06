@@ -1,5 +1,6 @@
 // src/controllers/admin/instructorController.js
 const { query, queryOne, insert, transaction } = require('../../config/database');
+const bcrypt = require('bcryptjs');
 const ApiResponse = require('../../utils/apiResponse');
 const { getPagination, getPagingData } = require('../../utils/pagination');
 
@@ -85,7 +86,9 @@ const getInstructorById = async (req, res) => {
 
     // Get courses taught by this instructor
     const courses = await query(
-      `SELECT c.id, c.course_code, c.name, c.credits, c.current_students, c.max_students, c.status
+      `SELECT c.id, c.course_code, c.name, c.credits, 
+              (SELECT COUNT(*) FROM registrations r WHERE r.course_id = c.id AND r.status != 'Đã hủy') as current_students, 
+              c.max_students, c.status
        FROM courses c
        WHERE c.instructor_id = ?
        ORDER BY c.status ASC, c.name ASC`,
@@ -120,24 +123,41 @@ const createInstructor = async (req, res) => {
       return ApiResponse.badRequest(res, 'Mã giảng viên đã tồn tại');
     }
 
-    const result = await insert(
-      `INSERT INTO instructors (
-        instructor_code, full_name, email, phone,
-        department_id, academic_rank, degree, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        instructor_code, full_name,
-        email || `${instructor_code.toLowerCase()}@ptit.edu.vn`,
-        phone || null,
-        department_id || null,
-        academic_rank || null,
-        degree || 'Thạc sĩ',
-        status || 'Đang dạy'
-      ]
-    );
+    const result = await transaction(async (connection) => {
+      // 1. Create user account
+      const salt = await bcrypt.genSalt(10);
+      const defaultPassword = instructor_code + '@Ptit';
+      const hashedPassword = await bcrypt.hash(defaultPassword, salt);
+      
+      const [userResult] = await connection.execute(
+        'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+        [instructor_code, hashedPassword, 'instructor']
+      );
+      
+      const userId = userResult.insertId;
+
+      // 2. Create instructor
+      const [instructorResult] = await connection.execute(
+        `INSERT INTO instructors (
+          user_id, instructor_code, full_name, email, phone,
+          department_id, academic_rank, degree, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          userId, instructor_code, full_name,
+          email || `${instructor_code.toLowerCase()}@ptit.edu.vn`,
+          phone || null,
+          department_id || null,
+          academic_rank || null,
+          degree || 'Thạc sĩ',
+          status || 'Đang dạy'
+        ]
+      );
+      
+      return instructorResult.insertId;
+    });
 
     return ApiResponse.created(res, {
-      id: result.insertId,
+      id: result,
       instructor_code,
       full_name
     }, 'Thêm giảng viên thành công');
@@ -274,7 +294,7 @@ const getTopRated = async (req, res) => {
     const topRated = await query(
       `SELECT i.id, i.instructor_code, i.full_name, i.rating, i.department_id,
               d.name as department_name,
-              (SELECT COALESCE(SUM(c.current_students), 0) FROM courses c WHERE c.instructor_id = i.id) as total_students
+              (SELECT COUNT(*) FROM registrations r JOIN courses c ON r.course_id = c.id WHERE c.instructor_id = i.id AND r.status != 'Đã hủy') as total_students
        FROM instructors i
        LEFT JOIN departments d ON i.department_id = d.id
        WHERE i.rating > 0

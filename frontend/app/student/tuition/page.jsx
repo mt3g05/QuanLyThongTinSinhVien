@@ -161,8 +161,24 @@ export default function TuitionPage() {
         {/* Content Section */}
         {selectedSemester === "ALL" ? (
           /* ================= ALL SEMESTERS VIEW ================= */
-          <div className="card">
-            <div className="card-header">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+              <div className="card" style={{ padding: '1.5rem', borderLeft: '4px solid var(--primary)', background: 'linear-gradient(to right, rgba(185, 28, 28, 0.05), transparent)' }}>
+                <div style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', fontWeight: 600 }}>TỔNG PHẢI THU</div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--primary)', marginTop: '0.5rem' }}>{formatCurrency(totalPayableAll)}</div>
+              </div>
+              <div className="card" style={{ padding: '1.5rem', borderLeft: '4px solid #16a34a', background: 'linear-gradient(to right, rgba(22, 163, 74, 0.05), transparent)' }}>
+                <div style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', fontWeight: 600 }}>TỔNG ĐÃ NỘP</div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#16a34a', marginTop: '0.5rem' }}>{formatCurrency(totalPaidAll)}</div>
+              </div>
+              <div className="card" style={{ padding: '1.5rem', borderLeft: '4px solid #dc2626', background: 'linear-gradient(to right, rgba(220, 38, 38, 0.05), transparent)' }}>
+                <div style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', fontWeight: 600 }}>TỔNG CÒN NỢ</div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#dc2626', marginTop: '0.5rem' }}>{formatCurrency(totalRemainingAll)}</div>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-header">
               <h2 className="card-title"><Calendar /> Tổng hợp học phí các kỳ</h2>
             </div>
             <div className="card-content">
@@ -179,13 +195,13 @@ export default function TuitionPage() {
                   <table className="table grades-table">
                     <thead>
                       <tr>
-                        <th className="text-center">STT</th>
-                        <th>Học kỳ năm học</th>
-                        <th className="text-right">HP chưa giảm</th>
-                        <th className="text-right">Miễn giảm</th>
-                        <th className="text-right">Phải thu</th>
-                        <th className="text-right">Đã thu</th>
-                        <th className="text-right">Còn nợ</th>
+                        <th style={{ width: '5%', padding: '12px 8px', textAlign: 'center' }}>STT</th>
+                        <th style={{ width: '25%', padding: '12px 8px', textAlign: 'left' }}>Học kỳ năm học</th>
+                        <th style={{ width: '14%', padding: '12px 8px', textAlign: 'right' }}>HP chưa giảm</th>
+                        <th style={{ width: '14%', padding: '12px 8px', textAlign: 'right' }}>Miễn giảm</th>
+                        <th style={{ width: '14%', padding: '12px 8px', textAlign: 'right' }}>Phải thu</th>
+                        <th style={{ width: '14%', padding: '12px 8px', textAlign: 'right' }}>Đã thu</th>
+                        <th style={{ width: '14%', padding: '12px 8px', textAlign: 'right' }}>Còn nợ</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -219,6 +235,7 @@ export default function TuitionPage() {
               )}
             </div>
           </div>
+          </div>
         ) : (
           /* ================= SPECIFIC SEMESTER VIEW ================= */
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -241,12 +258,12 @@ export default function TuitionPage() {
                       <table className="table grades-table">
                         <thead>
                           <tr>
-                            <th className="text-center">STT</th>
-                            <th>Tên môn học</th>
-                            <th className="text-center">Số tín chỉ</th>
-                            <th className="text-right">Số tiền</th>
-                            <th className="text-right">Miễn giảm</th>
-                            <th className="text-right">Phải thu</th>
+                            <th style={{ textAlign: 'center', width: '5%', padding: '12px 8px' }}>STT</th>
+                            <th style={{ textAlign: 'left', width: '35%', padding: '12px 8px' }}>Tên môn học</th>
+                            <th style={{ textAlign: 'center', width: '15%', padding: '12px 8px' }}>Số tín chỉ</th>
+                            <th style={{ textAlign: 'right', width: '15%', padding: '12px 8px' }}>Số tiền</th>
+                            <th style={{ textAlign: 'right', width: '15%', padding: '12px 8px' }}>Miễn giảm</th>
+                            <th style={{ textAlign: 'right', width: '15%', padding: '12px 8px' }}>Phải thu</th>
                           </tr>
                         </thead>
                         <tbody>

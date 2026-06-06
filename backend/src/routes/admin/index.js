@@ -12,6 +12,7 @@ router.use('/dashboard', require('./dashboardRoutes'));
 router.use('/students', require('./studentRoutes'));
 router.use('/instructors', require('./instructorRoutes'));
 router.use('/classes', require('./classRoutes'));
+router.use('/courses', require('./courseRoutes'));
 router.use('/grades', require('./gradeRoutes'));
 // router.use('/reports', require('./reportRoutes'));
 router.use('/settings', require('./settingRoutes'));

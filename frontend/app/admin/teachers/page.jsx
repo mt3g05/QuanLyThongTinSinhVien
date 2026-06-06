@@ -569,8 +569,7 @@ export default function TeachersPage() {
                       <option value="Cử nhân">Cử nhân</option>
                       <option value="Thạc sĩ">Thạc sĩ</option>
                       <option value="Tiến sĩ">Tiến sĩ</option>
-                      <option value="PGS.TS">PGS.TS</option>
-                      <option value="GS.TS">GS.TS</option>
+                      <option value="GS/PGS">GS/PGS</option>
                     </select>
                   </div>
                   <div>
@@ -578,7 +577,7 @@ export default function TeachersPage() {
                     <select className="form-input" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
                       <option value="Đang dạy">Đang dạy</option>
                       <option value="Nghỉ phép">Nghỉ phép</option>
-                      <option value="Đã nghỉ việc">Đã nghỉ việc</option>
+                      <option value="Đã nghỉ">Đã nghỉ</option>
                     </select>
                   </div>
                 </div>

@@ -31,9 +31,25 @@ const getDashboard = async (req, res) => {
       [studentId]
     );
 
+    // Get real cumulative GPA dynamically from approved grades
+    const realStats = await queryOne(
+      `SELECT (SUM(max_gpa * credits) / NULLIF(SUM(credits), 0)) as avg_gpa, SUM(CASE WHEN max_gpa > 0 THEN credits ELSE 0 END) as total_credits
+       FROM (
+         SELECT g.course_id, c.credits, MAX(g.gpa_score) as max_gpa
+         FROM grades g
+         LEFT JOIN courses c ON g.course_id = c.id
+         WHERE g.student_id = ? AND g.status = 'Đã duyệt' AND g.gpa_score IS NOT NULL
+         GROUP BY g.course_id, c.credits
+       ) as best_grades`,
+      [studentId]
+    );
+
+    const studentGpa = realStats?.avg_gpa ? parseFloat(realStats.avg_gpa).toFixed(2) : 0;
+    const studentTotalCredits = realStats?.total_credits || 0;
+
     // Progress
     const progress = student.required_credits > 0
-      ? ((student.total_credits / student.required_credits) * 100).toFixed(0)
+      ? ((studentTotalCredits / student.required_credits) * 100).toFixed(0)
       : 0;
 
     return ApiResponse.success(res, {
@@ -44,11 +60,11 @@ const getDashboard = async (req, res) => {
       class_name: student.class_name,
       department_name: student.department_name,
       major_name: student.major_name,
-      gpa: student.gpa,
-      total_credits: student.total_credits,
+      gpa: studentGpa,
+      total_credits: studentTotalCredits,
       required_credits: student.required_credits,
       progress: parseInt(progress),
-      classification: getAcademicClassification(student.gpa),
+      classification: getAcademicClassification(studentGpa),
       status: student.status
     });
   } catch (error) {

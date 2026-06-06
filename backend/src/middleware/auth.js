@@ -43,6 +43,13 @@ const authenticate = async (req, res, next) => {
       role: user.role
     };
 
+    if (user.role === 'instructor') {
+      const instructor = await queryOne('SELECT id FROM instructors WHERE user_id = ?', [user.id]);
+      if (instructor) {
+        req.user.instructorId = instructor.id;
+      }
+    }
+
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {

@@ -15,4 +15,8 @@ router.use('/admin', adminRoutes);
 // Student routes (protected)
 router.use('/student', studentRoutes);
 
+// Instructor routes (protected)
+const instructorRoutes = require('./instructorRoutes');
+router.use('/instructor', instructorRoutes);
+
 module.exports = router;

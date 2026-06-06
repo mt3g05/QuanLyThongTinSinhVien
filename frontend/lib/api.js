@@ -41,8 +41,9 @@ async function doRefreshToken() {
 
     const data = await response.json();
 
-    if (data.data && data.data.token) {
-      localStorage.setItem('ptit_token', data.data.token);
+    if (data.data && (data.data.accessToken || data.data.token)) {
+      const newToken = data.data.accessToken || data.data.token;
+      localStorage.setItem('ptit_token', newToken);
       if (data.data.refreshToken) {
         localStorage.setItem('ptit_refresh_token', data.data.refreshToken);
       }

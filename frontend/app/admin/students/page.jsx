@@ -7,7 +7,7 @@ import { adminStudentService, adminDepartmentService, adminMajorService, classSe
 import { exportToCSV } from "@/lib/utils/exportUtils"
 import {
   Users, Search, Plus, Eye, Edit, Trash2, Download, Upload,
-  ChevronLeft, ChevronRight, GraduationCap
+  ChevronLeft, ChevronRight, GraduationCap, Check, CheckCircle
 } from "lucide-react"
 
 export default function StudentsPage() {
@@ -18,6 +18,7 @@ export default function StudentsPage() {
   const [genderFilter, setGenderFilter] = useState("all")
   const [trainingSystemFilter, setTrainingSystemFilter] = useState("all")
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [confirmApproveAll, setConfirmApproveAll] = useState(false)
   const [successMsg, setSuccessMsg] = useState("")
   const [errorMsg, setErrorMsg] = useState("")
   
@@ -65,6 +66,25 @@ export default function StudentsPage() {
     onSuccess: () => {
       setSuccessMsg("Cập nhật sinh viên thành công")
       setShowModal(false)
+      refetch()
+      setTimeout(() => setSuccessMsg(""), 3000)
+    },
+    onError: (err) => { setErrorMsg(err.message); setTimeout(() => setErrorMsg(""), 3000) }
+  })
+
+  const { mutate: approveStudent, loading: approving } = useMutation(adminStudentService.approve, {
+    onSuccess: () => {
+      setSuccessMsg("Duyệt sinh viên thành công")
+      refetch()
+      setTimeout(() => setSuccessMsg(""), 3000)
+    },
+    onError: (err) => { setErrorMsg(err.message); setTimeout(() => setErrorMsg(""), 3000) }
+  })
+
+  const { mutate: approveAllStudents, loading: approvingAll } = useMutation(adminStudentService.approveAll, {
+    onSuccess: (res) => {
+      setSuccessMsg(res?.message || "Đã duyệt tất cả sinh viên")
+      setConfirmApproveAll(false)
       refetch()
       setTimeout(() => setSuccessMsg(""), 3000)
     },
@@ -127,6 +147,7 @@ export default function StudentsPage() {
 
   const handleImport = async (e) => {
     e.preventDefault()
+    if (importing) return
     if (!importFile) return alert("Vui lòng chọn file Excel")
     
     setImporting(true)
@@ -215,10 +236,13 @@ export default function StudentsPage() {
                   </form>
                   <div className="admin-toolbar-right" style={{ display: "flex", gap: "0.5rem" }}>
                     <button className="btn btn-outline btn-sm" onClick={() => setShowImportModal(true)}>
-                      <Upload size={16} /> Nhập Excel
+                      <Download size={16} /> Nhập Excel
                     </button>
                     <button className="btn btn-outline btn-sm" onClick={handleExport}>
-                      <Download size={16} /> Xuất CSV
+                      <Upload size={16} /> Xuất CSV
+                    </button>
+                    <button className="btn btn-outline btn-sm" style={{ borderColor: "#16a34a", color: "#16a34a" }} onClick={() => setConfirmApproveAll(true)}>
+                      <CheckCircle size={16} /> Duyệt tất cả
                     </button>
                     <button className="btn btn-primary btn-sm" onClick={openCreate}>
                       <Plus size={16} /> Thêm sinh viên
@@ -267,8 +291,9 @@ export default function StudentsPage() {
                     <option value="Đang học">Đang học</option>
                     <option value="Đã tốt nghiệp">Đã tốt nghiệp</option>
                     <option value="Chờ duyệt">Chờ duyệt</option>
-                    <option value="Đình chỉ">Đình chỉ</option>
+                    <option value="Tạm nghỉ">Tạm nghỉ</option>
                     <option value="Bảo lưu">Bảo lưu</option>
+                    <option value="Bị đuổi">Bị đuổi</option>
                   </select>
 
                   <select
@@ -294,9 +319,7 @@ export default function StudentsPage() {
                   >
                     <option value="all">Tất cả Hệ đào tạo</option>
                     <option value="Chính quy">Chính quy</option>
-                    <option value="Chất lượng cao">Chất lượng cao</option>
-                    <option value="Liên thông">Liên thông</option>
-                    <option value="Từ xa">Từ xa</option>
+                    <option value="Vừa học vừa làm">Vừa học vừa làm</option>
                   </select>
                 </div>
               </div>
@@ -362,6 +385,17 @@ export default function StudentsPage() {
                         </td>
                         <td style={{ padding: "12px 16px" }}>
                           <div style={{ display: "flex", gap: "8px" }}>
+                            {student.status === "Chờ duyệt" && (
+                              <button 
+                                className="btn btn-outline btn-sm btn-icon" 
+                                style={{ color: "#16a34a", borderColor: "#16a34a" }} 
+                                title="Duyệt sinh viên" 
+                                onClick={() => approveStudent(student.id)}
+                                disabled={approving}
+                              >
+                                <Check size={14} />
+                              </button>
+                            )}
                             <button className="btn btn-outline btn-sm btn-icon" title="Chi tiết" onClick={() => openView(student)}><Eye size={14} /></button>
                             <button className="btn btn-outline btn-sm btn-icon" title="Sửa" onClick={() => openEdit(student)}><Edit size={14} /></button>
                             <button 
@@ -433,6 +467,37 @@ export default function StudentsPage() {
                   disabled={deleting}
                 >
                   {deleting ? "Đang xóa..." : "Xóa"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Confirm Approve All */}
+        {confirmApproveAll && (
+          <div style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100
+          }}>
+            <div style={{
+              background: "var(--card)", borderRadius: "0.75rem",
+              padding: "2rem", maxWidth: "400px", width: "90%"
+            }}>
+              <h3 style={{ fontWeight: 700, marginBottom: "0.5rem" }}>Xác nhận duyệt tất cả</h3>
+              <p style={{ color: "var(--muted-foreground)", marginBottom: "1.5rem" }}>
+                Bạn có chắc chắn muốn duyệt tất cả sinh viên đang ở trạng thái <strong>Chờ duyệt</strong> thành <strong>Đang học</strong> không?
+              </p>
+              <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+                <button className="btn btn-outline" onClick={() => setConfirmApproveAll(false)} disabled={approvingAll}>
+                  Hủy
+                </button>
+                <button
+                  className="btn btn-primary"
+                  style={{ background: "#16a34a" }}
+                  onClick={() => approveAllStudents()}
+                  disabled={approvingAll}
+                >
+                  {approvingAll ? "Đang xử lý..." : "Duyệt tất cả"}
                 </button>
               </div>
             </div>
@@ -528,8 +593,9 @@ export default function StudentsPage() {
                       <option value="Chờ duyệt">Chờ duyệt</option>
                       <option value="Đang học">Đang học</option>
                       <option value="Đã tốt nghiệp">Đã tốt nghiệp</option>
+                      <option value="Tạm nghỉ">Tạm nghỉ</option>
                       <option value="Bảo lưu">Bảo lưu</option>
-                      <option value="Đình chỉ">Đình chỉ</option>
+                      <option value="Bị đuổi">Bị đuổi</option>
                     </select>
                   </div>
                 </div>
@@ -558,9 +624,10 @@ export default function StudentsPage() {
                     </p>
                     <input 
                       type="file" 
-                      accept=".xlsx, .xls" 
+                      accept=".xlsx, .xls, .csv" 
                       className="form-input" 
                       onChange={(e) => setImportFile(e.target.files[0])} 
+                      onClick={(e) => { e.target.value = null }}
                       required 
                     />
                   </div>

@@ -14,8 +14,9 @@ const getAllNotifications = async (req, res) => {
     let params = [];
 
     if (search) {
-      whereClause += ' AND n.title LIKE ?';
-      params.push(`%${search}%`);
+      // [FIX BUG-015] Tìm kiếm theo cả title lẫn content
+      whereClause += ' AND (n.title LIKE ? OR n.content LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
     }
 
     if (type && type !== 'all') {

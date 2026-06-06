@@ -12,15 +12,10 @@ import {
   BookOpen,
   TrendingUp,
   Calendar,
-  MoreHorizontal,
-  ArrowRight,
   UserPlus,
   FileText,
   Settings,
   Bell,
-  CheckCircle,
-  Clock,
-  AlertTriangle,
   Building
 } from "lucide-react"
 
@@ -31,16 +26,10 @@ export default function AdminDashboard() {
   const router = useRouter()
   
   const { data: statsData } = useApi(dashboardService.getStats, [], { defaultData: null })
-  const { data: upcomingEvents } = useApi(dashboardService.getEvents, [], { defaultData: [] })
   const { data: facultyStats } = useApi(dashboardService.getDistribution, [], { defaultData: [] })
 
   const totalStudents = facultyStats.reduce((sum, f) => sum + f.student_count, 0)
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "—";
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("vi-VN");
-  }
 
   return (
     <div className="dashboard-content">
@@ -181,55 +170,6 @@ export default function AdminDashboard() {
                   <Bell size={24} />
                   <span>Thông báo</span>
                 </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Content Grid */}
-        <div className="content-grid">
-          {/* Right Column */}
-          <div className="admin-right-column" style={{ display: 'grid', gridTemplateColumns: '1fr' }}>
-            {/* Upcoming Events */}
-            <div 
-              className="card cursor-pointer"
-              onClick={() => router.push('/admin/events')}
-              style={{ cursor: 'pointer', transition: 'transform 0.2s' }}
-              onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-              onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-            >
-              <div className="card-header">
-                <h2 className="card-title">
-                  <Calendar className="card-title-icon" />
-                  Sự kiện sắp tới
-                </h2>
-              </div>
-              <div className="card-content">
-                <div className="events-list">
-                  {upcomingEvents.map((event, index) => (
-                    <div key={index} className="event-item">
-                      <div className={`event-icon ${
-                        event.type === "exam" ? "event-icon-danger" :
-                        event.type === "deadline" ? "event-icon-warning" : "event-icon-info"
-                      }`}>
-                        <Calendar size={16} />
-                      </div>
-                      <div className="event-info">
-                        <p className="event-title">{event.title}</p>
-                        <p className="event-date">{formatDate(event.event_date)}</p>
-                      </div>
-                      <span className={`badge ${
-                        event.type === "exam" ? "badge-danger" :
-                        event.type === "deadline" ? "badge-warning" : "badge-info"
-                      }`}>
-                        {event.type === "exam" ? "Thi" : event.type === "deadline" ? "Deadline" : "Sự kiện"}
-                      </span>
-                    </div>
-                  ))}
-                  {upcomingEvents.length === 0 && (
-                    <p className="text-center text-muted py-2">Không có sự kiện sắp tới</p>
-                  )}
-                </div>
               </div>
             </div>
           </div>

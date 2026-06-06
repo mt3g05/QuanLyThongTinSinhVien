@@ -2,18 +2,16 @@
 const { query, queryOne } = require('../../config/database');
 const ApiResponse = require('../../utils/apiResponse');
 
-// @desc    Get dashboard statistics
-// @route   GET /api/admin/dashboard/stats
-
-// @desc    Get online users count (student, teacher)
+// @desc    Get online users count (student, instructor)
 // @route   GET /api/admin/dashboard/online-users
 const getOnlineUsersCount = async (req, res) => {
   try {
     const onlineStudents = await queryOne(
       "SELECT COUNT(*) as count FROM users WHERE role = 'student' AND last_login >= DATE_SUB(NOW(), INTERVAL 30 MINUTE) AND is_active = true"
     );
+    // [FIX BUG-020] Sửa role 'teacher' → 'instructor' đúng với schema DB
     const onlineInstructors = await queryOne(
-      "SELECT COUNT(*) as count FROM users WHERE role = 'teacher' AND last_login >= DATE_SUB(NOW(), INTERVAL 30 MINUTE) AND is_active = true"
+      "SELECT COUNT(*) as count FROM users WHERE role = 'instructor' AND last_login >= DATE_SUB(NOW(), INTERVAL 30 MINUTE) AND is_active = true"
     );
 
     return ApiResponse.success(res, {
@@ -26,6 +24,8 @@ const getOnlineUsersCount = async (req, res) => {
   }
 };
 
+// @desc    Get dashboard statistics
+// @route   GET /api/admin/dashboard/stats
 const getStats = async (req, res) => {
   try {
     // Total students
@@ -116,6 +116,10 @@ const getEvents = async (req, res) => {
 
     return ApiResponse.success(res, events);
   } catch (error) {
+    // [FIX BUG-021] Graceful fallback: bảng events chưa tồn tại → trả mảng rỗng thay vì crash 500
+    if (error.code === 'ER_NO_SUCH_TABLE') {
+      return ApiResponse.success(res, [], 'Chưa có sự kiện nào');
+    }
     console.error('Events error:', error);
     return ApiResponse.error(res, 'Lỗi khi lấy sự kiện');
   }

@@ -192,7 +192,7 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (username, password, rememberMe) => {
     try {
-      const response = await apiLogin(username, password);
+      const response = await apiLogin(username, password, rememberMe);
 
       if (response.success && response.data) {
         if (response.data.requirePasswordChange) {
@@ -237,6 +237,8 @@ export function AuthProvider({ children }) {
         // Redirect theo role
         if (userData.role === 'admin') {
           router.push('/admin');
+        } else if (userData.role === 'instructor') {
+          router.push('/instructor');
         } else {
           router.push('/student');
         }

@@ -324,26 +324,6 @@ export default function ProfilePage() {
                 <span className="badge badge-success">{student.status}</span>
               </div>
             </div>
-            <div className="profile-quick-stats">
-              <div className="profile-stat">
-                <span className="profile-stat-value">
-                  {student.gpa != null ? student.gpa : "—"}
-                </span>
-                <span className="profile-stat-label">GPA</span>
-              </div>
-              <div className="profile-stat">
-                <span className="profile-stat-value">
-                  {student.total_credits != null ? student.total_credits : "—"}
-                </span>
-                <span className="profile-stat-label">Tín chỉ</span>
-              </div>
-              <div className="profile-stat">
-                <span className="profile-stat-value">
-                  {student.class_code || "—"}
-                </span>
-                <span className="profile-stat-label">Lớp</span>
-              </div>
-            </div>
           </div>
         </div>
 

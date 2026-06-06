@@ -97,9 +97,14 @@ const markAllAsRead = async (req, res) => {
     );
 
     if (unreadNotifications.length > 0) {
-      const values = unreadNotifications.map(n => `(${n.id}, ${req.user.id})`).join(',');
+      const placeholders = unreadNotifications.map(() => '(?, ?)').join(', ');
+      const params = [];
+      unreadNotifications.forEach(n => {
+        params.push(n.id, req.user.id);
+      });
       await insert(
-        `INSERT IGNORE INTO notification_reads (notification_id, user_id) VALUES ${values}`
+        `INSERT IGNORE INTO notification_reads (notification_id, user_id) VALUES ${placeholders}`,
+        params
       );
     }
 

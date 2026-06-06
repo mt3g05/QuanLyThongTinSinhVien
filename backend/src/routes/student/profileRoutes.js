@@ -4,6 +4,8 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const profileController = require('../../controllers/student/profileController');
+// [FIX BUG-024] Import middleware kiểm tra magic bytes
+const { validateImageFile } = require('../../middleware/validateFileType');
 
 // Multer config for avatar upload
 const storage = multer.diskStorage({
@@ -35,6 +37,7 @@ router.get('/', profileController.getProfile);
 router.put('/personal', profileController.updatePersonal);
 router.put('/contact', profileController.updateContact);
 router.put('/family', profileController.updateFamily);
-router.put('/avatar', upload.single('avatar'), profileController.updateAvatar);
+// [FIX BUG-024] Thêm validateImageFile để kiểm tra magic bytes sau khi multer lưu file
+router.put('/avatar', upload.single('avatar'), validateImageFile, profileController.updateAvatar);
 
-module.exports = router;
+module.exports = router;

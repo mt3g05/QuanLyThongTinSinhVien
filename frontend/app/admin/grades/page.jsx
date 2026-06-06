@@ -4,6 +4,8 @@ import { useState } from "react"
 import { Header } from "@/components/dashboard/header"
 import { DonutChart, SimpleAreaChart } from "@/components/dashboard/charts"
 import { useApi, usePaginatedApi, useMutation } from "@/hooks/use-api"
+import { GradeSummary } from "@/components/admin/grades/GradeSummary"
+import { GradeDistribution } from "@/components/admin/grades/GradeDistribution"
 import { adminGradeService, adminDepartmentService, cohortService, adminMajorService } from "@/lib/services/adminService"
 import { exportToCSV } from "@/lib/utils/exportUtils"
 import {
@@ -331,83 +333,10 @@ export default function AdminGradesPage() {
         )}
 
         {/* Summary Stats */}
-        <div className="summary-grid">
-          <div className="summary-item">
-            <div className="summary-item-header">
-              <div className="summary-item-icon primary"><FileText size={20} /></div>
-            </div>
-            <div className="summary-item-value">
-              {statsLoading ? "..." : (stats && stats.total) || 0}
-            </div>
-            <div className="summary-item-label">Tổng bảng điểm</div>
-          </div>
-          <div className="summary-item">
-            <div className="summary-item-header">
-              <div className="summary-item-icon success"><CheckCircle size={20} /></div>
-            </div>
-            <div className="summary-item-value">
-              {statsLoading ? "..." : (stats && stats.approved) || 0}
-            </div>
-            <div className="summary-item-label">Đã duyệt</div>
-          </div>
-          <div className="summary-item">
-            <div className="summary-item-header">
-              <div className="summary-item-icon warning"><Clock size={20} /></div>
-            </div>
-            <div className="summary-item-value">
-              {statsLoading ? "..." : (stats && stats.pending) || 0}
-            </div>
-            <div className="summary-item-label">Chờ duyệt</div>
-          </div>
-          <div className="summary-item">
-            <div className="summary-item-header">
-              <div className="summary-item-icon info"><Award size={20} /></div>
-            </div>
-            <div className="summary-item-value">
-              {statsLoading ? "..." : (stats && stats.avgGPA) || "—"}
-            </div>
-            <div className="summary-item-label">GPA Trung bình</div>
-          </div>
-        </div>
-
-
+        <GradeSummary statsLoading={statsLoading} stats={stats} />
 
         {/* Grade Distribution */}
-        {distList.length > 0 && (
-          <div className="chart-card" style={{ marginTop: "24px" }}>
-            <div className="chart-card-header">
-              <h3 className="chart-card-title"><BarChart3 /> Phân bố điểm số</h3>
-            </div>
-            <div className="chart-card-body">
-              <div className="ranking-list">
-                {distList.map(function (item, idx) {
-                  var maxCount = Math.max.apply(null, distList.map(function (d) { return d.count }))
-                  var pct = maxCount > 0 ? (item.count / maxCount) * 100 : 0
-                  var color = item.letter_grade && item.letter_grade.startsWith("A")
-                    ? "#16a34a"
-                    : item.letter_grade && item.letter_grade.startsWith("B")
-                    ? "#2563eb"
-                    : item.letter_grade && item.letter_grade.startsWith("C")
-                    ? "#f59e0b"
-                    : "#dc2626"
-                  return (
-                    <div key={idx} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "8px 0" }}>
-                      <span style={{ width: "40px", fontSize: "13px", fontWeight: 700, color: color }}>
-                        {item.letter_grade}
-                      </span>
-                      <div className="progress-bar-mini" style={{ flex: 1 }}>
-                        <div style={{ height: "100%", width: pct + "%", background: color, borderRadius: "3px" }} />
-                      </div>
-                      <span style={{ fontSize: "13px", fontWeight: 600, width: "60px", textAlign: "right" }}>
-                        {item.count}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-        )}
+        <GradeDistribution distList={distList} />
 
         {/* Filters */}
         <div className="card" style={{ marginTop: "24px" }}>
@@ -552,6 +481,7 @@ export default function AdminGradesPage() {
                     <th style={{ width: "40px" }}><input type="checkbox" /></th>
                     <th>Sinh viên</th>
                     <th>Môn học</th>
+                    <th>Giảng viên</th>
                     <th>Học kỳ</th>
                     <th className="text-center">Giữa kỳ</th>
                     <th className="text-center">Cuối kỳ</th>
@@ -564,13 +494,13 @@ export default function AdminGradesPage() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={10} style={{ textAlign: "center", padding: "2rem", color: "var(--muted-foreground)" }}>
+                      <td colSpan={11} style={{ textAlign: "center", padding: "2rem", color: "var(--muted-foreground)" }}>
                         Đang tải...
                       </td>
                     </tr>
                   ) : gradeList.length === 0 ? (
                     <tr>
-                      <td colSpan={10} style={{ textAlign: "center", padding: "2rem", color: "var(--muted-foreground)" }}>
+                      <td colSpan={11} style={{ textAlign: "center", padding: "2rem", color: "var(--muted-foreground)" }}>
                         Không có dữ liệu
                       </td>
                     </tr>
@@ -618,6 +548,14 @@ export default function AdminGradesPage() {
                             <p style={{ fontSize: "12px", color: "var(--muted-foreground)" }}>
                               {grade.course_code}
                             </p>
+                          </td>
+                          <td>
+                            <div className="student-cell" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                              <div className="avatar avatar-sm" style={{ width: "24px", height: "24px", fontSize: "10px", background: "var(--primary-light)", color: "var(--primary)" }}>
+                                {grade.instructor_name ? grade.instructor_name.split(" ").pop().charAt(0) : "?"}
+                              </div>
+                              <span style={{ fontSize: "0.875rem", fontWeight: 500 }}>{grade.instructor_name || "-"}</span>
+                            </div>
                           </td>
                           <td style={{ fontSize: "13px" }}>{grade.semester}</td>
                           <td className="text-center">

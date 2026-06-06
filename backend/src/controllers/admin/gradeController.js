@@ -73,13 +73,15 @@ const getAllGrades = async (req, res) => {
       `SELECT g.*,
               s.student_code, s.full_name as student_name,
               c.course_code, c.name as course_name, c.credits,
-              cl.class_code
+              cl.class_code,
+              i.full_name as instructor_name
        FROM grades g
        LEFT JOIN students s ON g.student_id = s.id
        LEFT JOIN courses c ON g.course_id = c.id
        LEFT JOIN classes cl ON s.class_id = cl.id
+       LEFT JOIN instructors i ON c.instructor_id = i.id
        ${whereClause}
-       ORDER BY g.created_at DESC
+       ORDER BY g.updated_at DESC
        LIMIT ? OFFSET ?`,
       [...params, pageSize, offset]
     );
@@ -159,14 +161,28 @@ const createGrade = async (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         student_id, course_id, semester,
-        attendance_score || null,
-        midterm_score || null,
-        final_score || null,
+        attendance_score ?? null,
+        midterm_score ?? null,
+        final_score ?? null,
         average_score,
         letter_grade,
         gpa_score,
         'Chờ duyệt'
       ]
+    );
+
+    // [FIX BUG] Tự động đăng ký môn học và cập nhật sĩ số
+    await insert(
+      `INSERT IGNORE INTO registrations (student_id, course_id, semester, status) 
+       VALUES (?, ?, ?, 'Đã xác nhận')`,
+      [student_id, course_id, semester]
+    );
+
+    await query(
+      `UPDATE courses c 
+       SET current_students = (SELECT COUNT(*) FROM registrations r WHERE r.course_id = c.id) 
+       WHERE id = ?`,
+      [course_id]
     );
 
     return ApiResponse.created(res, { id: result.insertId }, 'Nhập điểm thành công');
@@ -187,6 +203,14 @@ const updateGrade = async (req, res) => {
     const grade = await queryOne('SELECT * FROM grades WHERE id = ?', [id]);
     if (!grade) {
       return ApiResponse.notFound(res, 'Không tìm thấy bảng điểm');
+    }
+
+    // [FIX BUG-011] Không cho phép sửa điểm đã duyệt
+    if (grade.status === 'Đã duyệt') {
+      return ApiResponse.badRequest(
+        res,
+        'Không thể sửa điểm đã duyệt. Vui lòng từ chối điểm trước, sau đó nhập lại.'
+      );
     }
 
     // Recalculate
@@ -266,10 +290,19 @@ const rejectGrade = async (req, res) => {
       return ApiResponse.notFound(res, 'Không tìm thấy bảng điểm');
     }
 
-    await insert(
-      `UPDATE grades SET status = 'Từ chối', approved_by = ?, approved_at = NOW() WHERE id = ?`,
-      [req.user.id, id]
-    );
+    // [FIX BUG-010] Ghi nhớ trạng thái trước khi từ chối
+    const wasApproved = grade.status === 'Đã duyệt';
+
+    // [FIX BUG-010] Dùng transaction + cập nhật GPA nếu điểm đang được duyệt
+    await transaction(async (connection) => {
+      await connection.execute(
+        `UPDATE grades SET status = 'Từ chối', approved_by = ?, approved_at = NOW() WHERE id = ?`,
+        [req.user.id, id]
+      );
+      if (wasApproved) {
+        await updateStudentGPA(grade.student_id, connection);
+      }
+    });
 
     return ApiResponse.success(res, null, 'Từ chối điểm thành công');
   } catch (error) {
@@ -283,6 +316,15 @@ const rejectGrade = async (req, res) => {
 const approveAll = async (req, res) => {
   try {
     const { course_id, semester } = req.body;
+
+    // [FIX BUG-008] Bắt buộc phải có ít nhất 1 điều kiện lọc
+    // Tránh vô tình duyệt toàn bộ điểm của hệ thống
+    if (!course_id && !semester) {
+      return ApiResponse.badRequest(
+        res,
+        'Phải cung cấp course_id hoặc semester để duyệt hàng loạt. Không cho phép duyệt toàn bộ hệ thống cùng lúc.'
+      );
+    }
 
     let whereClause = "WHERE status = 'Chờ duyệt'";
     let params = [];
@@ -402,11 +444,14 @@ const deleteGrade = async (req, res) => {
       return ApiResponse.notFound(res, 'Không tìm thấy bảng điểm');
     }
 
-    await insert('DELETE FROM grades WHERE id = ?', [id]);
-
-    if (grade.status === 'Đã duyệt') {
-      await updateStudentGPA(grade.student_id);
-    }
+    // [FIX BUG-007] Dùng transaction để đảm bảo tính nhất quán
+    // Nếu updateStudentGPA fail thì DELETE cũng rollback
+    await transaction(async (connection) => {
+      await connection.execute('DELETE FROM grades WHERE id = ?', [id]);
+      if (grade.status === 'Đã duyệt') {
+        await updateStudentGPA(grade.student_id, connection);
+      }
+    });
 
     return ApiResponse.success(res, null, 'Xóa bảng điểm thành công');
   } catch (error) {
@@ -434,14 +479,17 @@ const getGradeFormOptions = async (req, res) => {
   }
 };
 
-// Helper: Update student's cumulative GPA
 const updateStudentGPA = async (studentId, connection = null) => {
   try {
     let result;
-    const sqlSelect = `SELECT AVG(g.gpa_score) as avg_gpa, SUM(c.credits) as total_credits
-                       FROM grades g
-                       LEFT JOIN courses c ON g.course_id = c.id
-                       WHERE g.student_id = ? AND g.status = 'Đã duyệt' AND g.gpa_score > 0`;
+    const sqlSelect = `SELECT (SUM(max_gpa * credits) / NULLIF(SUM(credits), 0)) as avg_gpa, SUM(CASE WHEN max_gpa > 0 THEN credits ELSE 0 END) as total_credits
+                       FROM (
+                         SELECT g.course_id, c.credits, MAX(g.gpa_score) as max_gpa
+                         FROM grades g
+                         LEFT JOIN courses c ON g.course_id = c.id
+                         WHERE g.student_id = ? AND g.status = 'Đã duyệt' AND g.gpa_score IS NOT NULL
+                         GROUP BY g.course_id, c.credits
+                       ) as best_grades`;
 
     if (connection) {
       const [rows] = await connection.execute(sqlSelect, [studentId]);
@@ -466,120 +514,22 @@ const updateStudentGPA = async (studentId, connection = null) => {
   }
 };
 
+const gradeService = require('../../services/gradeService');
+
 // @desc    Import grades from excel
 // @route   POST /api/admin/grades/import
 const importGrades = async (req, res) => {
   try {
     const { department_id, cohort_id, major_id, class_id, semester } = req.body;
-    if (!req.file) return ApiResponse.error(res, 'Vui lòng đính kèm file Excel hoặc CSV');
+    
+    const result = await gradeService.processImport(
+      req.file, department_id, cohort_id, major_id, class_id, semester
+    );
 
-    let successCount = 0;
-    let errorCount = 0;
-    let errors = [];
-
-    let cQuery = 'SELECT id, student_code FROM students WHERE 1=1';
-    let params = [];
-    if (class_id) { cQuery += ' AND class_id = ?'; params.push(class_id); }
-    else if (major_id) { cQuery += ' AND major_id = ?'; params.push(major_id); }
-    else if (department_id) { cQuery += ' AND department_id = ?'; params.push(department_id); }
-    else if (cohort_id) { cQuery += ' AND cohort_id = ?'; params.push(cohort_id); }
-
-    const students = await query(cQuery, params);
-    const studentMap = {};
-    students.forEach(s => studentMap[s.student_code.toLowerCase()] = s.id);
-
-    const courses = await query('SELECT id, course_code FROM courses');
-    const courseMap = {};
-    courses.forEach(c => courseMap[c.course_code.toLowerCase()] = c.id);
-
-    const isCSV = req.file.originalname.toLowerCase().endsWith('.csv') || req.file.mimetype === 'text/csv';
-    const rows = [];
-
-    if (isCSV) {
-      // Parse CSV
-      const text = req.file.buffer.toString('utf-8').replace(/^\uFEFF/, ''); // strip BOM
-      const lines = text.split(/\r?\n/).filter(l => l.trim());
-      lines.slice(1).forEach((line, idx) => {
-        const cells = line.split(',');
-        rows.push({
-          rowNumber: idx + 2,
-          sCode: cells[0]?.trim(),
-          cCode: cells[1]?.trim(),
-          att: parseFloat(cells[2]),
-          mid: parseFloat(cells[3]),
-          fin: parseFloat(cells[4])
-        });
-      });
-    } else {
-      // Parse Excel
-      const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(req.file.buffer);
-      const worksheet = workbook.worksheets[0];
-      if (!worksheet) return ApiResponse.error(res, 'File Excel không có dữ liệu');
-
-      worksheet.eachRow((row, rowNumber) => {
-        if (rowNumber > 1) {
-          rows.push({
-            rowNumber,
-            sCode: row.getCell(1).value?.toString().trim(),
-            cCode: row.getCell(2).value?.toString().trim(),
-            att: parseFloat(row.getCell(3).value),
-            mid: parseFloat(row.getCell(4).value),
-            fin: parseFloat(row.getCell(5).value)
-          });
-        }
-      });
-    }
-
-    for (const r of rows) {
-      if (!r.sCode || !r.cCode) {
-        errorCount++;
-        continue;
-      }
-      const studentId = studentMap[r.sCode.toLowerCase()];
-      const courseId = courseMap[r.cCode.toLowerCase()];
-
-      if (!studentId || !courseId) {
-        errorCount++;
-        errors.push(`Dòng ${r.rowNumber}: Không tìm thấy SV (${r.sCode}) hoặc Môn học (${r.cCode}) trong bối cảnh lớp/ngành đã chọn`);
-        continue;
-      }
-
-      let average_score = null;
-      let letter_grade = null;
-      let gpa_score = null;
-
-      if (!isNaN(r.mid) && !isNaN(r.fin)) {
-        average_score = calculateAverage(r.mid, r.fin);
-        const gradeInfo = getLetterGrade(average_score);
-        letter_grade = gradeInfo.letter;
-        gpa_score = gradeInfo.gpa;
-      }
-
-      try {
-        await insert(
-          `INSERT INTO grades (student_id, course_id, semester, attendance_score, midterm_score, final_score, average_score, letter_grade, gpa_score, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Chờ duyệt')
-           ON DUPLICATE KEY UPDATE 
-           attendance_score=VALUES(attendance_score), midterm_score=VALUES(midterm_score), final_score=VALUES(final_score),
-           average_score=VALUES(average_score), letter_grade=VALUES(letter_grade), gpa_score=VALUES(gpa_score), status='Chờ duyệt'`,
-          [studentId, courseId, semester, 
-           isNaN(r.att) ? null : r.att, 
-           isNaN(r.mid) ? null : r.mid, 
-           isNaN(r.fin) ? null : r.fin, 
-           average_score, letter_grade, gpa_score]
-        );
-        successCount++;
-      } catch (err) {
-        errorCount++;
-        errors.push(`Dòng ${r.rowNumber}: Lỗi lưu dữ liệu`);
-      }
-    }
-
-    return ApiResponse.success(res, { successCount, errorCount, errors }, 'Import hoàn tất');
+    return ApiResponse.success(res, result, 'Import hoàn tất');
   } catch (error) {
     console.error('Import grade error:', error);
-    return ApiResponse.error(res, 'Lỗi khi import file Excel');
+    return ApiResponse.error(res, error.message || 'Lỗi khi import file Excel');
   }
 };
 

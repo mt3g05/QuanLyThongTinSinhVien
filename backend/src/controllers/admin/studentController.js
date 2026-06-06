@@ -155,10 +155,28 @@ const createStudent = async (req, res) => {
       return ApiResponse.badRequest(res, 'Mã sinh viên đã tồn tại');
     }
 
+    // [FIX] Kiểm tra tính hợp lệ giữa Khóa học, Mã lớp, Mã sinh viên
+    if (cohort_id) {
+      const cohort = await queryOne('SELECT code FROM cohorts WHERE id = ?', [cohort_id]);
+      if (cohort && cohort.code && cohort.code.toUpperCase().startsWith('K')) {
+        const suffix = cohort.code.toUpperCase().substring(1);
+        if (student_code && !student_code.toUpperCase().startsWith('B' + suffix)) {
+          return ApiResponse.badRequest(res, `Mã sinh viên phải bắt đầu bằng B${suffix} đối với khóa ${cohort.code}`);
+        }
+        if (class_id) {
+          const classData = await queryOne('SELECT class_code FROM classes WHERE id = ?', [class_id]);
+          if (classData && classData.class_code && !classData.class_code.toUpperCase().startsWith('D' + suffix)) {
+            return ApiResponse.badRequest(res, `Mã lớp phải bắt đầu bằng D${suffix} đối với khóa ${cohort.code}`);
+          }
+        }
+      }
+    }
+
     const result = await transaction(async (connection) => {
       // Create user account for student
       const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash('123456', salt); // Default password
+      const defaultPassword = student_code + '@Ptit';
+      const hashedPassword = await bcrypt.hash(defaultPassword, salt); // Default password
 
       const [userResult] = await connection.execute(
         'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
@@ -235,6 +253,26 @@ const updateStudent = async (req, res) => {
       const emailExists = await queryOne('SELECT id FROM students WHERE email = ? AND id != ?', [updateData.email, id]);
       if (emailExists) {
         return ApiResponse.badRequest(res, 'Email này đã được sử dụng bởi sinh viên khác');
+      }
+    }
+
+    // [FIX] Kiểm tra tính hợp lệ giữa Khóa học, Mã lớp, Mã sinh viên
+    const finalCohortId = updateData.cohort_id !== undefined ? updateData.cohort_id : student.cohort_id;
+    const finalClassId = updateData.class_id !== undefined ? updateData.class_id : student.class_id;
+    
+    if (finalCohortId) {
+      const cohort = await queryOne('SELECT code FROM cohorts WHERE id = ?', [finalCohortId]);
+      if (cohort && cohort.code && cohort.code.toUpperCase().startsWith('K')) {
+        const suffix = cohort.code.toUpperCase().substring(1);
+        if (student.student_code && !student.student_code.toUpperCase().startsWith('B' + suffix)) {
+          return ApiResponse.badRequest(res, `Mã sinh viên (${student.student_code}) không khớp với khóa ${cohort.code}. Vui lòng kiểm tra lại thông tin Khóa học.`);
+        }
+        if (finalClassId) {
+          const classData = await queryOne('SELECT class_code FROM classes WHERE id = ?', [finalClassId]);
+          if (classData && classData.class_code && !classData.class_code.toUpperCase().startsWith('D' + suffix)) {
+            return ApiResponse.badRequest(res, `Mã lớp phải bắt đầu bằng D${suffix} đối với khóa ${cohort.code}`);
+          }
+        }
       }
     }
 
@@ -316,20 +354,20 @@ const deleteStudent = async (req, res) => {
     }
 
     await transaction(async (connection) => {
-      // Delete user account
-      if (student.user_id) {
-        await connection.execute('DELETE FROM notification_reads WHERE user_id = ?', [student.user_id]);
-        await connection.execute('DELETE FROM users WHERE id = ?', [student.user_id]);
-      }
-
       // Delete related records
       await connection.execute('DELETE FROM grades WHERE student_id = ?', [id]);
       await connection.execute('DELETE FROM registrations WHERE student_id = ?', [id]);
       await connection.execute('DELETE FROM tuitions WHERE student_id = ?', [id]);
       await connection.execute('DELETE FROM requests WHERE student_id = ?', [id]);
 
-      // Delete student
+      // Delete student FIRST to avoid foreign key issues
       await connection.execute('DELETE FROM students WHERE id = ?', [id]);
+
+      // Then delete user account
+      if (student.user_id) {
+        await connection.execute('DELETE FROM notification_reads WHERE user_id = ?', [student.user_id]);
+        await connection.execute('DELETE FROM users WHERE id = ?', [student.user_id]);
+      }
 
       // Update class count
       if (student.class_id) {
@@ -357,7 +395,12 @@ const importStudents = async (req, res) => {
 
     const ExcelJS = require('exceljs');
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(req.file.path);
+    try {
+      await workbook.xlsx.readFile(req.file.path);
+    } catch (e) {
+      if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      return ApiResponse.badRequest(res, 'File tải lên bị hỏng hoặc không đúng định dạng Excel');
+    }
 
     const worksheet = workbook.worksheets[0]; // Get the first worksheet
     if (!worksheet) {
@@ -442,6 +485,11 @@ const importStudents = async (req, res) => {
       return null;
     };
 
+    // [FIX BUG-003] Detect trùng lặp ngay trong file trước khi query DB
+    // Tránh trường hợp 2 dòng cùng mã SV/email trong 1 file gây lỗi DB
+    const seenCodes  = new Set();
+    const seenEmails = new Set();
+
     // Iterate through rows starting from row 2
     for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
       const row = worksheet.getRow(rowNumber);
@@ -456,10 +504,28 @@ const importStudents = async (req, res) => {
         continue;
       }
 
-      // Check existence
+      // [FIX BUG-003] Kiểm tra trùng lặp trong cùng file (batch check)
+      if (seenCodes.has(student_code.toLowerCase())) {
+        errors.push(`Dòng ${rowNumber}: Mã SV "${student_code}" bị trùng lặp trong file (Bỏ qua)`);
+        continue;
+      }
+      if (seenEmails.has(email.toLowerCase())) {
+        errors.push(`Dòng ${rowNumber}: Email "${email}" bị trùng lặp trong file (Bỏ qua)`);
+        continue;
+      }
+      seenCodes.add(student_code.toLowerCase());
+      seenEmails.add(email.toLowerCase());
+
+      // Check existence in DB
       const existing = await queryOne('SELECT id FROM students WHERE student_code = ?', [student_code]);
       if (existing) {
         errors.push(`Dòng ${rowNumber}: Sinh viên ${student_code} đã tồn tại (Bỏ qua)`);
+        continue;
+      }
+
+      const existingEmail = await queryOne('SELECT id FROM students WHERE email = ?', [email]);
+      if (existingEmail) {
+        errors.push(`Dòng ${rowNumber}: Email ${email} đã được sử dụng (Bỏ qua)`);
         continue;
       }
 
@@ -478,13 +544,36 @@ const importStudents = async (req, res) => {
 
       const training_system = colSystem ? (row.getCell(colSystem).value?.toString().trim() || 'Chính quy') : 'Chính quy';
       
-      const cohortVal = colCohort ? row.getCell(colCohort).value?.toString().trim().toLowerCase() : null;
-      const cohort_id = cohortVal ? cohortMap[cohortVal] : null;
+      const cohortVal = colCohort ? row.getCell(colCohort).value?.toString().trim() : null;
+      const cohort_id = cohortVal ? cohortMap[cohortVal.toLowerCase()] : null;
+
+      // [FIX] Kiểm tra tính hợp lệ giữa Khóa học, Mã lớp, Mã sinh viên khi Import
+      let skipRow = false;
+      if (cohort_id) {
+        const cohortObj = cohorts.find(c => c.id === cohort_id);
+        if (cohortObj && cohortObj.code && cohortObj.code.toUpperCase().startsWith('K')) {
+          const suffix = cohortObj.code.toUpperCase().substring(1);
+          if (student_code && !student_code.toUpperCase().startsWith('B' + suffix)) {
+            errors.push(`Dòng ${rowNumber}: Mã SV phải bắt đầu bằng B${suffix} đối với ${cohortObj.code}`);
+            skipRow = true;
+          }
+          if (!skipRow && class_id) {
+            const classObj = classes.find(c => c.id === class_id);
+            if (classObj && classObj.class_code && !classObj.class_code.toUpperCase().startsWith('D' + suffix)) {
+              errors.push(`Dòng ${rowNumber}: Mã lớp phải bắt đầu bằng D${suffix} đối với ${cohortObj.code}`);
+              skipRow = true;
+            }
+          }
+        }
+      }
+      
+      if (skipRow) continue;
 
       try {
         await transaction(async (connection) => {
           const salt = await bcrypt.genSalt(10);
-          const hashedPassword = await bcrypt.hash('123456', salt);
+          const defaultPassword = student_code + '@Ptit';
+          const hashedPassword = await bcrypt.hash(defaultPassword, salt);
 
           const [userResult] = await connection.execute(
             'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
@@ -528,11 +617,49 @@ const importStudents = async (req, res) => {
   }
 };
 
+// @desc    Approve student
+// @route   PUT /api/admin/students/:id/approve
+const approveStudent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const student = await queryOne('SELECT * FROM students WHERE id = ?', [id]);
+    if (!student) {
+      return ApiResponse.notFound(res, 'Không tìm thấy sinh viên');
+    }
+    
+    if (student.status !== 'Chờ duyệt') {
+      return ApiResponse.badRequest(res, 'Sinh viên không ở trạng thái chờ duyệt');
+    }
+
+    await query('UPDATE students SET status = ? WHERE id = ?', ['Đang học', id]);
+    
+    return ApiResponse.success(res, null, 'Duyệt sinh viên thành công');
+  } catch (error) {
+    console.error('Approve student error:', error);
+    return ApiResponse.error(res, 'Lỗi khi duyệt sinh viên');
+  }
+};
+
+// @desc    Approve all pending students
+// @route   POST /api/admin/students/approve-all
+const approveAllStudents = async (req, res) => {
+  try {
+    const result = await query("UPDATE students SET status = 'Đang học' WHERE status = 'Chờ duyệt'");
+    
+    return ApiResponse.success(res, { count: result.affectedRows }, `Duyệt thành công ${result.affectedRows} sinh viên`);
+  } catch (error) {
+    console.error('Approve all students error:', error);
+    return ApiResponse.error(res, 'Lỗi khi duyệt tất cả sinh viên');
+  }
+};
+
 module.exports = {
   getAllStudents,
   getStudentById,
   createStudent,
   updateStudent,
   deleteStudent,
-  importStudents
+  importStudents,
+  approveStudent,
+  approveAllStudents
 };

@@ -21,6 +21,9 @@ export default function LoginPage() {
   const [forceUsername, setForceUsername] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  // [FIX UI-001] Tách riêng 2 state hiển thị mật khẩu để không ảnh hưởng lẫn nhau
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   
   const { login, user, isLoading: authLoading } = useAuth()
   const router = useRouter()
@@ -30,6 +33,8 @@ export default function LoginPage() {
     if (!authLoading && user) {
       if (user.role === "admin") {
         router.push("/admin")
+      } else if (user.role === "instructor") {
+        router.push("/instructor")
       } else {
         router.push("/student")
       }
@@ -90,6 +95,8 @@ export default function LoginPage() {
       // Reload page to re-initialize authContext
       if (user.role === "admin") {
         window.location.href = "/admin"
+      } else if (user.role === "instructor") {
+        window.location.href = "/instructor"
       } else {
         window.location.href = "/student"
       }
@@ -182,7 +189,7 @@ export default function LoginPage() {
                   <div className="form-input-wrapper">
                     <Lock className="form-input-icon" />
                     <input
-                      type={showPassword ? "text" : "password"}
+                      type={showNewPassword ? "text" : "password"}
                       className="form-input"
                       placeholder="Mật khẩu mới..."
                       value={newPassword}
@@ -192,9 +199,9 @@ export default function LoginPage() {
                     <button
                       type="button"
                       className="form-input-toggle"
-                      onClick={() => setShowPassword(!showPassword)}
+                      onClick={() => setShowNewPassword(!showNewPassword)}
                     >
-                      {showPassword ? <EyeOff /> : <Eye />}
+                      {showNewPassword ? <EyeOff /> : <Eye />}
                     </button>
                   </div>
                 </div>
@@ -205,13 +212,20 @@ export default function LoginPage() {
                   <div className="form-input-wrapper">
                     <Lock className="form-input-icon" />
                     <input
-                      type={showPassword ? "text" : "password"}
+                      type={showConfirmPassword ? "text" : "password"}
                       className="form-input"
                       placeholder="Nhập lại mật khẩu..."
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       required
                     />
+                    <button
+                      type="button"
+                      className="form-input-toggle"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? <EyeOff /> : <Eye />}
+                    </button>
                   </div>
                 </div>
 

@@ -18,10 +18,21 @@ const getGradeOverview = async (req, res) => {
       return ApiResponse.notFound(res, 'Không tìm thấy thông tin sinh viên');
     }
 
-    const student = await queryOne(
-      `SELECT gpa, total_credits FROM students WHERE id = ?`,
+    // Get real cumulative GPA dynamically from approved grades
+    const realStats = await queryOne(
+      `SELECT (SUM(max_gpa * credits) / NULLIF(SUM(credits), 0)) as avg_gpa, SUM(CASE WHEN max_gpa > 0 THEN credits ELSE 0 END) as total_credits
+       FROM (
+         SELECT g.course_id, c.credits, MAX(g.gpa_score) as max_gpa
+         FROM grades g
+         LEFT JOIN courses c ON g.course_id = c.id
+         WHERE g.student_id = ? AND g.status = 'Đã duyệt' AND g.gpa_score IS NOT NULL
+         GROUP BY g.course_id, c.credits
+       ) as best_grades`,
       [studentId]
     );
+
+    const studentGpa = realStats?.avg_gpa ? parseFloat(realStats.avg_gpa).toFixed(2) : 0;
+    const studentTotalCredits = realStats?.total_credits || 0;
 
     // Get current semester GPA
     const currentSemester = await queryOne('SELECT code FROM semesters WHERE is_current = true');
@@ -47,9 +58,9 @@ const getGradeOverview = async (req, res) => {
     );
 
     return ApiResponse.success(res, {
-      cumulativeGPA: student.gpa,
-      totalCredits: student.total_credits,
-      classification: getAcademicClassification(student.gpa),
+      cumulativeGPA: studentGpa,
+      totalCredits: studentTotalCredits,
+      classification: getAcademicClassification(studentGpa),
       currentSemesterGPA: currentGPA,
       semesters: semesters.map(s => s.semester)
     });

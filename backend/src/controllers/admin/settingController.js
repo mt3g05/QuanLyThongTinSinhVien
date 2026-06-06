@@ -26,6 +26,15 @@ const changePassword = async (req, res) => {
       return ApiResponse.badRequest(res, 'Mật khẩu hiện tại không chính xác');
     }
 
+    // [FIX BUG-017] Validate độ mạnh mật khẩu mới (đồng nhất với forceChangePassword)
+    const strongPasswordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/;
+    if (!strongPasswordRegex.test(new_password)) {
+      return ApiResponse.badRequest(
+        res,
+        'Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ cái, số và ký tự đặc biệt (@$!%*#?&)'
+      );
+    }
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(new_password, salt);
 

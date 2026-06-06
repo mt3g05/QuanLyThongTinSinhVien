@@ -49,8 +49,9 @@ const login = async (req, res) => {
       return ApiResponse.unauthorized(res, 'Tên đăng nhập hoặc mật khẩu không đúng');
     }
 
-    // Force password change for student's first login
-    if (user.role === 'student' && password === '123456') {
+    // Force password change for student/instructor's first login
+    const isDefaultPassword = await bcrypt.compare(user.username + '@Ptit', user.password);
+    if ((user.role === 'student' || user.role === 'instructor') && isDefaultPassword) {
       const tempToken = jwt.sign(
         { id: user.id, username: user.username, role: user.role, isTemp: true },
         process.env.JWT_SECRET,
@@ -63,7 +64,7 @@ const login = async (req, res) => {
         data: {
           requirePasswordChange: true,
           tempToken,
-          user: { username: user.username }
+          user: { username: user.username, role: user.role }
         }
       });
     }
@@ -92,6 +93,14 @@ const login = async (req, res) => {
       );
       if (student) {
         userInfo = { ...userInfo, ...student, studentId: student.id };
+      }
+    } else if (user.role === 'instructor') {
+      const instructor = await queryOne(
+        'SELECT id, instructor_code, full_name, avatar, email FROM instructors WHERE user_id = ?',
+        [user.id]
+      );
+      if (instructor) {
+        userInfo = { ...userInfo, ...instructor, instructorId: instructor.id };
       }
     } else if (user.role === 'admin') {
       userInfo.full_name = 'Admin PTIT';

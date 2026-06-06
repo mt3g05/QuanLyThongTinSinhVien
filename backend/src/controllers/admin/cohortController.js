@@ -1,5 +1,5 @@
 const { query, queryOne, insert } = require('../../config/database');
-const ApiResponse = require('../../utils/ApiResponse');
+const ApiResponse = require('../../utils/apiResponse');
 
 // @desc    Get all cohorts
 // @route   GET /api/admin/cohorts

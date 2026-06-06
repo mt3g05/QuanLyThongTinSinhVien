@@ -187,6 +187,11 @@ export default function GradesPage() {
             </div>
           </div>
         </div>
+        
+        {/* GPA Formula Explanation */}
+        <div style={{ marginTop: "1.5rem", marginBottom: "1.5rem", fontSize: "0.875rem", color: "var(--muted-foreground)", background: "var(--secondary)", padding: "1rem", borderRadius: "0.5rem", border: "1px solid var(--border)" }}>
+          <strong style={{ color: "var(--foreground)" }}>Cách tính GPA Tích lũy:</strong> GPA tích lũy = (Điểm hệ 4 môn 1 × Số tín chỉ môn 1 + Điểm hệ 4 môn 2 × Số tín chỉ môn 2 + ... + Điểm hệ 4 môn n × Số tín chỉ môn n) / (Tổng số tín chỉ của tất cả các môn)
+        </div>
 
         {/* Semester Selector */}
         <div className="grades-controls">
