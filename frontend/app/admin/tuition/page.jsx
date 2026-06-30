@@ -3,9 +3,9 @@
 import { useState } from "react"
 import { Header } from "@/components/dashboard/header"
 import { useApi, usePaginatedApi, useMutation } from "@/hooks/use-api"
-import { adminTuitionService, cohortService } from "@/lib/services/adminService"
+import { adminTuitionService, cohortService, settingService, adminStudentService } from "@/lib/services/adminService"
 import {
-  CreditCard, Search, ChevronLeft, ChevronRight, CheckCircle, Clock, AlertTriangle, FileText, Check, Eye, Printer
+  CreditCard, Search, ChevronLeft, ChevronRight, CheckCircle, Clock, AlertTriangle, FileText, Check, Eye, Printer, Plus, Trash2
 } from "lucide-react"
 
 export default function AdminTuitionPage() {
@@ -14,6 +14,17 @@ export default function AdminTuitionPage() {
   const [semesterFilter, setSemesterFilter] = useState("all")
   const [cohortFilter, setCohortFilter] = useState("all")
   const [viewingInvoice, setViewingInvoice] = useState(null)
+
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createForm, setCreateForm] = useState({
+    studentCodeSearch: "",
+    selectedStudent: null,
+    totalCredits: "",
+  })
+  const [searchStudentResults, setSearchStudentResults] = useState([])
+  const [searchingStudent, setSearchingStudent] = useState(false)
+  
+  const { data: settings } = useApi(settingService.getAll, [], { defaultData: {} })
 
   const handlePrint = () => {
     const printContent = document.getElementById("invoice-print-area");
@@ -88,6 +99,97 @@ export default function AdminTuitionPage() {
       },
     }
   )
+
+  const { mutate: createTuition, loading: creatingTuition } = useMutation(
+    adminTuitionService.create,
+    {
+      onSuccess: function () {
+        setSuccessMsg("Tạo hóa đơn thành công")
+        setShowCreateModal(false)
+        setCreateForm({ studentCodeSearch: "", selectedStudent: null, totalCredits: "" })
+        refetch()
+        setTimeout(function () { setSuccessMsg("") }, 3000)
+      },
+      onError: function (err) {
+        setErrorMsg(err.message || "Lỗi tạo hóa đơn")
+        setTimeout(function () { setErrorMsg("") }, 3000)
+      },
+    }
+  )
+
+  const { mutate: deleteTuition, loading: deletingTuition } = useMutation(
+    adminTuitionService.delete,
+    {
+      onSuccess: function () {
+        setSuccessMsg("Xóa hóa đơn thành công")
+        refetch()
+        setTimeout(function () { setSuccessMsg("") }, 3000)
+      },
+      onError: function (err) {
+        setErrorMsg(err.message || "Lỗi xóa hóa đơn")
+        setTimeout(function () { setErrorMsg("") }, 3000)
+      },
+    }
+  )
+
+  const handleDeleteTuition = (id) => {
+    if (window.confirm("Bạn có chắc chắn muốn xóa hóa đơn học phí này?")) {
+      deleteTuition(id)
+    }
+  }
+
+  const handleSearchStudent = async () => {
+    if (!createForm.studentCodeSearch.trim()) return;
+    setSearchingStudent(true)
+    try {
+      const res = await adminStudentService.getAll({ search: createForm.studentCodeSearch.trim(), limit: 5 })
+      setSearchStudentResults(res.data || [])
+    } catch (e) {
+      setErrorMsg("Lỗi tìm kiếm sinh viên")
+    } finally {
+      setSearchingStudent(false)
+    }
+  }
+
+  const handleSelectStudent = async (student) => {
+    setCreateForm({...createForm, selectedStudent: student, totalCredits: "Đang tải..."})
+    try {
+      const currentSemester = settings?.current_semester || "HK1"
+      const res = await adminTuitionService.getRegisteredCredits(student.id, { semester: currentSemester })
+      setCreateForm(prev => ({
+        ...prev, 
+        selectedStudent: student, 
+        totalCredits: res.data?.total_credits?.toString() || "0"
+      }))
+    } catch (e) {
+      console.error("Lỗi lấy tín chỉ:", e)
+      setCreateForm(prev => ({
+        ...prev, 
+        selectedStudent: student, 
+        totalCredits: "0"
+      }))
+    }
+  }
+
+  const handleCreateTuition = (e) => {
+    e.preventDefault()
+    if (!createForm.selectedStudent) {
+      setErrorMsg("Vui lòng chọn sinh viên")
+      return
+    }
+    if (!createForm.totalCredits) {
+      setErrorMsg("Vui lòng nhập số tín chỉ")
+      return
+    }
+    const currentSemester = settings?.current_semester || "HK1"
+    const creditPrice = settings?.credit_price || 0
+    createTuition({
+      student_id: createForm.selectedStudent.id,
+      semester: currentSemester,
+      total_credits: createForm.totalCredits,
+      credit_fee: creditPrice
+    })
+  }
 
   function handleSearch(e) {
     e.preventDefault()
@@ -179,6 +281,7 @@ export default function AdminTuitionPage() {
                   <option value="all">Tất cả trạng thái</option>
                   <option value="Đã thanh toán">Đã thanh toán</option>
                   <option value="Chưa thanh toán">Chưa thanh toán</option>
+                  <option value="Chờ xác nhận">Chờ xác nhận</option>
                 </select>
                 <select
                   className="filter-select"
@@ -203,6 +306,11 @@ export default function AdminTuitionPage() {
                   <option value="HK1_2023_2024">HK1 2023-2024</option>
                   <option value="HK2_2023_2024">HK2 2023-2024</option>
                 </select>
+              </div>
+              <div className="admin-toolbar-right">
+                <button className="btn btn-primary btn-sm" onClick={() => setShowCreateModal(true)}>
+                  <Plus size={16} style={{ marginRight: 4 }}/> Tạo hóa đơn
+                </button>
               </div>
             </div>
           </div>
@@ -266,9 +374,18 @@ export default function AdminTuitionPage() {
                               onClick={() => handleUpdateStatus(t.id, 'Đã thanh toán')}
                               disabled={updating}
                             >
-                              <Check size={14} style={{ marginRight: 4 }}/> Thu tiền
+                              <Check size={14} style={{ marginRight: 4 }}/> {t.status === 'Chờ xác nhận' ? 'Xác nhận đã thu' : 'Thu tiền'}
                             </button>
                           )}
+                          <button
+                            className="btn btn-sm btn-outline"
+                            style={{ color: 'var(--destructive)', borderColor: 'var(--destructive)' }}
+                            onClick={() => handleDeleteTuition(t.id)}
+                            disabled={deletingTuition}
+                            title="Xóa hóa đơn"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -350,6 +467,89 @@ export default function AdminTuitionPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Create Modal */}
+        {showCreateModal && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
+            <div style={{ background: "var(--card)", padding: "1.5rem", borderRadius: "0.75rem", width: 600, maxHeight: "95vh", overflowY: "auto" }}>
+              <h3 style={{ fontWeight: 700, margin: "0 0 1.5rem 0", fontSize: "18px" }}>Tạo hóa đơn học phí</h3>
+              <form onSubmit={handleCreateTuition}>
+                <div style={{ marginBottom: "1rem" }}>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "14px", fontWeight: 500 }}>Tìm sinh viên</label>
+                  <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="Nhập mã sinh viên hoặc tên..." 
+                      value={createForm.studentCodeSearch}
+                      onChange={e => setCreateForm({...createForm, studentCodeSearch: e.target.value})}
+                    />
+                    <button type="button" className="btn btn-outline" onClick={handleSearchStudent} disabled={searchingStudent}>
+                      {searchingStudent ? "Đang tìm..." : "Tìm"}
+                    </button>
+                  </div>
+                  {searchStudentResults.length > 0 && !createForm.selectedStudent && (
+                    <div style={{ border: "1px solid var(--border)", borderRadius: "4px", maxHeight: "150px", overflowY: "auto" }}>
+                      {searchStudentResults.map(s => (
+                        <div 
+                          key={s.id} 
+                          style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)", cursor: "pointer", display: "flex", justifyContent: "space-between" }}
+                          onClick={() => handleSelectStudent(s)}
+                        >
+                          <div><strong>{s.student_code}</strong> - {s.full_name}</div>
+                          <div style={{ fontSize: "12px", color: "var(--muted-foreground)" }}>{s.class_name}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {createForm.selectedStudent && (
+                    <div style={{ padding: "10px", background: "var(--accent)", borderRadius: "4px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <strong>{createForm.selectedStudent.student_code}</strong> - {createForm.selectedStudent.full_name}
+                      </div>
+                      <button type="button" className="btn btn-outline btn-sm" onClick={() => setCreateForm({...createForm, selectedStudent: null})}>Đổi</button>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ marginBottom: "1rem" }}>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "14px", fontWeight: 500 }}>Học kỳ</label>
+                  <input type="text" className="form-input" disabled value={settings?.current_semester || "Chưa cài đặt"} />
+                </div>
+                
+                <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "14px", fontWeight: 500 }}>Số tín chỉ</label>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      disabled
+                      value={createForm.totalCredits}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "14px", fontWeight: 500 }}>Giá tín chỉ</label>
+                    <input type="text" className="form-input" disabled value={formatCurrency(settings?.credit_price || 0)} />
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: "1.5rem", padding: "1rem", background: "#f8fafc", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <strong style={{ fontSize: "16px" }}>Tổng tiền cần nộp:</strong>
+                  <span style={{ fontSize: "20px", fontWeight: 700, color: "#0f172a" }}>
+                    {formatCurrency((parseInt(createForm.totalCredits) || 0) * (parseInt(settings?.credit_price) || 0))}
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+                  <button type="button" className="btn btn-outline" onClick={() => setShowCreateModal(false)} disabled={creatingTuition}>Hủy</button>
+                  <button type="submit" className="btn btn-primary" disabled={creatingTuition || !createForm.selectedStudent}>
+                    {creatingTuition ? "Đang xử lý..." : "Tạo hóa đơn"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

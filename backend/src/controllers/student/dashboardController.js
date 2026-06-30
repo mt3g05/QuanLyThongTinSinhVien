@@ -84,7 +84,10 @@ const getTodaySchedule = async (req, res) => {
        LEFT JOIN instructors i ON s.instructor_id = i.id
        WHERE s.day_of_week = ?
        AND s.class_id = ?
-       AND s.week_start <= ? AND s.week_end >= ?
+       AND (
+         (s.week_start IS NULL AND s.week_end IS NULL)
+         OR (s.week_start <= ? AND s.week_end >= ?)
+       )
        ORDER BY s.period_start ASC`,
       [today, student.class_id, todayDate, todayDate]
     );
@@ -157,12 +160,12 @@ const getDashboardStats = async (req, res) => {
       return ApiResponse.notFound(res, 'Không tìm thấy thông tin sinh viên');
     }
 
-    // Current semester courses
+    // [FIX TASK-13] Đếm cả 'Đã xác nhận' vì import điểm set status này
     const currentCourses = await queryOne(
       `SELECT COUNT(*) as count, COALESCE(SUM(c.credits), 0) as total_credits
        FROM registrations r
        LEFT JOIN courses c ON r.course_id = c.id
-       WHERE r.student_id = ? AND r.status = 'Đã đăng ký'`,
+       WHERE r.student_id = ? AND r.status IN ('Đã đăng ký', 'Đã xác nhận')`,
       [studentId]
     );
 

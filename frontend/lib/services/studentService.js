@@ -104,3 +104,19 @@ export var notificationService = {
     return apiClient.delete('/student/notifications/' + id);
   },
 };
+
+// ===== Courses =====
+export var studentCourseService = {
+  getAvailable: function () {
+    return apiClient.get('/student/courses/available');
+  },
+  getMyRegistrations: function () {
+    return apiClient.get('/student/courses/my-registrations');
+  },
+  register: function (courseId) {
+    return apiClient.post('/student/courses/register/' + courseId);
+  },
+  cancel: function (courseId) {
+    return apiClient.post('/student/courses/cancel/' + courseId);
+  },
+};

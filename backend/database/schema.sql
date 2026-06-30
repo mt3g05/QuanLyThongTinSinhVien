@@ -43,7 +43,7 @@ CREATE TABLE users (
     id INT PRIMARY KEY AUTO_INCREMENT,
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
-    role ENUM('admin', 'student') NOT NULL,
+    role ENUM('admin', 'student', 'instructor') NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
     last_login DATETIME,
     refresh_token TEXT,
@@ -81,6 +81,7 @@ CREATE TABLE students (
     department_id INT,
     major_id INT,
     class_id INT,
+    cohort_id INT,
     academic_year VARCHAR(20),
     enrollment_date DATE,
     training_system ENUM('Chính quy', 'Vừa học vừa làm') DEFAULT 'Chính quy',
@@ -105,10 +106,24 @@ CREATE TABLE students (
 );
 
 -- =============================================
+-- COHORTS (Khóa học)
+-- =============================================
+CREATE TABLE IF NOT EXISTS cohorts (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    code VARCHAR(20) NOT NULL UNIQUE COMMENT 'VD: K2021',
+    name VARCHAR(100) NOT NULL COMMENT 'VD: Khóa 2021-2025',
+    start_year INT NOT NULL,
+    end_year INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- =============================================
 -- 5. INSTRUCTORS (Giảng viên)
 -- =============================================
 CREATE TABLE instructors (
     id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT UNIQUE,
     instructor_code VARCHAR(20) NOT NULL UNIQUE,
     full_name VARCHAR(100) NOT NULL,
     email VARCHAR(100),
@@ -123,7 +138,8 @@ CREATE TABLE instructors (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
-    FOREIGN KEY (department_id) REFERENCES departments(id)
+    FOREIGN KEY (department_id) REFERENCES departments(id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- =============================================
@@ -135,6 +151,8 @@ CREATE TABLE courses (
     name VARCHAR(150) NOT NULL,
     credits INT NOT NULL DEFAULT 3,
     department_id INT,
+    major_id INT,
+    class_id INT,
     instructor_id INT,
     description TEXT,
     type ENUM('Bắt buộc', 'Tự chọn', 'Thể chất/QP') DEFAULT 'Bắt buộc',
@@ -293,10 +311,12 @@ CREATE TABLE notification_reads (
     notification_id INT NOT NULL,
     user_id INT NOT NULL,
     read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted TINYINT(1) NOT NULL DEFAULT 0 COMMENT '0=visible, 1=hidden by user',
     
     FOREIGN KEY (notification_id) REFERENCES notifications(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id),
-    UNIQUE KEY unique_read (notification_id, user_id)
+    UNIQUE KEY unique_read (notification_id, user_id),
+    INDEX idx_nr_deleted (notification_id, user_id, is_deleted)
 );
 
 -- =============================================

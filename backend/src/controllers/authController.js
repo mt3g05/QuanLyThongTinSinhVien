@@ -50,7 +50,11 @@ const login = async (req, res) => {
     }
 
     // Force password change for student's first login
+<<<<<<< Updated upstream
     if (user.role === 'student' && password === '123456') {
+=======
+    if (user.role === 'student' && user.is_first_login) {
+>>>>>>> Stashed changes
       const tempToken = jwt.sign(
         { id: user.id, username: user.username, role: user.role, isTemp: true },
         process.env.JWT_SECRET,
@@ -98,12 +102,14 @@ const login = async (req, res) => {
       userInfo.email = 'admin@ptit.edu.vn';
     }
 
-    // Set cookie
+    // [FIX TASK-15] Cookie maxAge theo rememberMe: 30 ngày nếu nhớ mật khẩu, 1 ngày nếu không
     res.cookie('token', accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      maxAge: rememberMe
+        ? 30 * 24 * 60 * 60 * 1000  // 30 ngày nếu rememberMe=true
+        : 24 * 60 * 60 * 1000        // 1 ngày thông thường
     });
 
     return ApiResponse.success(res, {
@@ -259,7 +265,7 @@ const changePassword = async (req, res) => {
 
     // Update password
     await insert(
-      'UPDATE users SET password = ? WHERE id = ?',
+      'UPDATE users SET password = ?, is_first_login = 0 WHERE id = ?',
       [hashedPassword, user.id]
     );
 
@@ -304,7 +310,7 @@ const forceChangePassword = async (req, res) => {
 
     // Update password in db
     await insert(
-      'UPDATE users SET password = ? WHERE id = ?',
+      'UPDATE users SET password = ?, is_first_login = 0 WHERE id = ?',
       [hashedPassword, decoded.id]
     );
 

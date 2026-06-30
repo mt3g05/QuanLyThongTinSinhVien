@@ -307,14 +307,20 @@ function buildUserData(userData) {
   return {
     id: userData.id,
     username: userData.username,
-    name: userData.name || userData.username,
+    // [FIX TASK-14] Ưu tiên full_name từ nhiều nguồn: root level → student profile → username fallback
+    name: userData.full_name
+      || userData.name
+      || userData.student?.full_name
+      || userData.instructor?.full_name
+      || userData.username,
     role: userData.role,
     studentId: userData.student
       ? userData.student.student_code
-      : null,
+      : (userData.student_code || null),
     email: userData.student
       ? userData.student.email
-      : userData.username + '@ptit.edu.vn',
+      : (userData.email || userData.username + '@ptit.edu.vn'),
+    avatar: userData.avatar || userData.student?.avatar || null,
     student: userData.student || null,
   };
 }

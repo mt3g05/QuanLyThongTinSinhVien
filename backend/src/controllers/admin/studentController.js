@@ -1,5 +1,6 @@
 // src/controllers/admin/studentController.js
 const fs = require('fs');
+const path = require('path');
 const { query, queryOne, insert, transaction } = require('../../config/database');
 const bcrypt = require('bcryptjs');
 const ApiResponse = require('../../utils/apiResponse');
@@ -7,6 +8,15 @@ const { getPagination, getPagingData } = require('../../utils/pagination');
 
 // @desc    Get all students with pagination, search, filter
 // @route   GET /api/admin/students
+const resolveCohortId = async (cohortValue) => {
+  if (!cohortValue) return null;
+  if (!isNaN(cohortValue)) return parseInt(cohortValue, 10);
+  const existing = await queryOne('SELECT id FROM cohorts WHERE code = ? OR name = ?', [cohortValue, cohortValue]);
+  if (existing) return existing.id;
+  const result = await query('INSERT INTO cohorts (code, name) VALUES (?, ?)', [cohortValue, `Khóa ${cohortValue.replace(/^K/i, '')}`]);
+  return result.insertId;
+};
+
 const getAllStudents = async (req, res) => {
   try {
     const { page, limit, search, status, department_id, major_id, class_id, cohort_id, gender, training_system } = req.query;
@@ -75,6 +85,7 @@ const getAllStudents = async (req, res) => {
       `SELECT s.id, s.student_code, s.full_name, s.email, s.phone, s.avatar,
               s.gender, s.date_of_birth, s.gpa, s.total_credits, s.status,
               s.enrollment_date, s.created_at,
+              s.ethnicity, s.religion, s.id_number, s.id_issue_date, s.id_issue_place, s.training_system,
               d.name as department_name,
               m.name as major_name,
               c.class_code, c.name as class_name,
@@ -145,6 +156,10 @@ const createStudent = async (req, res) => {
       mother_name, mother_phone, mother_occupation
     } = req.body;
 
+    if (!student_code || !full_name || !date_of_birth || !gender || !ethnicity || !religion || !id_number || !id_issue_date || !id_issue_place) {
+      return ApiResponse.badRequest(res, 'Vui lòng cung cấp đầy đủ thông tin bắt buộc (Mã SV, Họ tên, Ngày sinh, Giới tính, Tôn giáo, Dân tộc, Số CCCD, Ngày cấp, Nơi cấp)');
+    }
+
     // Check if student code already exists
     const existing = await queryOne(
       'SELECT id FROM students WHERE student_code = ?',
@@ -155,10 +170,37 @@ const createStudent = async (req, res) => {
       return ApiResponse.badRequest(res, 'Mã sinh viên đã tồn tại');
     }
 
+<<<<<<< Updated upstream
     const result = await transaction(async (connection) => {
       // Create user account for student
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash('123456', salt); // Default password
+=======
+    const resolved_cohort_id = await resolveCohortId(cohort_id);
+
+    // [FIX] Kiểm tra tính hợp lệ giữa Khóa học, Mã lớp, Mã sinh viên
+    if (resolved_cohort_id) {
+      const cohort = await queryOne('SELECT code FROM cohorts WHERE id = ?', [resolved_cohort_id]);
+      if (cohort && cohort.code && cohort.code.toUpperCase().startsWith('K')) {
+        const suffix = cohort.code.toUpperCase().substring(1);
+        if (student_code && !(student_code.toUpperCase().startsWith('B' + suffix) || student_code.toUpperCase().startsWith('N' + suffix))) {
+          return ApiResponse.badRequest(res, `Mã sinh viên phải bắt đầu bằng B${suffix} hoặc N${suffix} đối với khóa ${cohort.code}`);
+        }
+        if (class_id) {
+          const classData = await queryOne('SELECT class_code FROM classes WHERE id = ?', [class_id]);
+          if (classData && classData.class_code && !classData.class_code.toUpperCase().startsWith('D' + suffix)) {
+            return ApiResponse.badRequest(res, `Mã lớp phải bắt đầu bằng D${suffix} đối với khóa ${cohort.code}`);
+          }
+        }
+      }
+    }
+
+    const result = await transaction(async (connection) => {
+      // Create user account for student
+      const salt = await bcrypt.genSalt(10);
+      const defaultPassword = '123456';
+      const hashedPassword = await bcrypt.hash(defaultPassword, salt); // Default password
+>>>>>>> Stashed changes
 
       const [userResult] = await connection.execute(
         'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
@@ -187,7 +229,7 @@ const createStudent = async (req, res) => {
           studentEmail, personal_email || null, phone || null,
           permanent_address || null, current_address || null,
           department_id || null, major_id || null, class_id || null,
-          cohort_id || null, enrollment_date || new Date(),
+          resolved_cohort_id || null, enrollment_date || new Date(),
           training_system || 'Chính quy', status || 'Chờ duyệt',
           father_name || null, father_phone || null, father_occupation || null,
           mother_name || null, mother_phone || null, mother_occupation || null
@@ -223,6 +265,10 @@ const updateStudent = async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
+    
+    if (updateData.cohort_id !== undefined) {
+      updateData.cohort_id = await resolveCohortId(updateData.cohort_id);
+    }
 
     // Check if student exists
     const student = await queryOne('SELECT * FROM students WHERE id = ?', [id]);
@@ -238,6 +284,29 @@ const updateStudent = async (req, res) => {
       }
     }
 
+<<<<<<< Updated upstream
+=======
+    // [FIX] Kiểm tra tính hợp lệ giữa Khóa học, Mã lớp, Mã sinh viên
+    const finalCohortId = updateData.cohort_id !== undefined ? updateData.cohort_id : student.cohort_id;
+    const finalClassId = updateData.class_id !== undefined ? updateData.class_id : student.class_id;
+    
+    if (finalCohortId) {
+      const cohort = await queryOne('SELECT code FROM cohorts WHERE id = ?', [finalCohortId]);
+      if (cohort && cohort.code && cohort.code.toUpperCase().startsWith('K')) {
+        const suffix = cohort.code.toUpperCase().substring(1);
+        if (student.student_code && !(student.student_code.toUpperCase().startsWith('B' + suffix) || student.student_code.toUpperCase().startsWith('N' + suffix))) {
+          return ApiResponse.badRequest(res, `Mã sinh viên (${student.student_code}) không khớp với khóa ${cohort.code}. Vui lòng kiểm tra lại thông tin Khóa học.`);
+        }
+        if (finalClassId) {
+          const classData = await queryOne('SELECT class_code FROM classes WHERE id = ?', [finalClassId]);
+          if (classData && classData.class_code && !classData.class_code.toUpperCase().startsWith('D' + suffix)) {
+            return ApiResponse.badRequest(res, `Mã lớp phải bắt đầu bằng D${suffix} đối với khóa ${cohort.code}`);
+          }
+        }
+      }
+    }
+
+>>>>>>> Stashed changes
     // Build dynamic update query
     const allowedFields = [
       'full_name', 'date_of_birth', 'gender', 'ethnicity', 'religion',
@@ -315,6 +384,21 @@ const deleteStudent = async (req, res) => {
       return ApiResponse.notFound(res, 'Không tìm thấy sinh viên');
     }
 
+    // [FIX TASK-20] Xóa avatar file nếu có (ngoại trừ file default)
+    if (student.avatar && !student.avatar.includes('default')) {
+      // Bỏ dấu '/' ở đầu để path.join hoạt động đúng trên Windows
+      const relativeAvatar = student.avatar.replace(/^\//, '');
+      // Lùi 3 cấp: admin -> controllers -> src -> backend
+      const avatarPath = path.join(__dirname, '../../../', relativeAvatar); 
+      if (fs.existsSync(avatarPath)) {
+        try {
+          fs.unlinkSync(avatarPath);
+        } catch (e) {
+          console.error('Failed to delete avatar file:', e);
+        }
+      }
+    }
+
     await transaction(async (connection) => {
       // Delete user account
       if (student.user_id) {
@@ -357,7 +441,21 @@ const importStudents = async (req, res) => {
 
     const ExcelJS = require('exceljs');
     const workbook = new ExcelJS.Workbook();
+<<<<<<< Updated upstream
     await workbook.xlsx.readFile(req.file.path);
+=======
+    try {
+      const ext = req.file.originalname ? path.extname(req.file.originalname).toLowerCase() : '';
+      if (ext === '.csv') {
+        await workbook.csv.readFile(req.file.path);
+      } else {
+        await workbook.xlsx.readFile(req.file.path);
+      }
+    } catch (e) {
+      if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      return ApiResponse.badRequest(res, 'File tải lên bị hỏng hoặc không đúng định dạng Excel/CSV');
+    }
+>>>>>>> Stashed changes
 
     const worksheet = workbook.worksheets[0]; // Get the first worksheet
     if (!worksheet) {
@@ -389,9 +487,14 @@ const importStudents = async (req, res) => {
     const colDept = getColIndex(['mã khoa', 'khoa', 'department code', 'department']);
     const colSystem = getColIndex(['hệ đào tạo', 'hệ']);
     const colCohort = getColIndex(['khóa', 'academic year', 'cohort']);
+    const colEthnicity = getColIndex(['dân tộc', 'ethnicity']);
+    const colReligion = getColIndex(['tôn giáo', 'religion']);
+    const colIdNumber = getColIndex(['số cccd', 'cccd', 'cmnd', 'id number', 'id_number']);
+    const colIdIssueDate = getColIndex(['ngày cấp', 'id issue date', 'issue_date']);
+    const colIdIssuePlace = getColIndex(['nơi cấp', 'id issue place', 'issue_place']);
 
-    if (!colCode || !colName || !colEmail) {
-      return ApiResponse.badRequest(res, 'File Excel thiếu các cột bắt buộc: Mã SV, Họ tên, Email');
+    if (!colCode || !colName || !colEmail || !colDob || !colGender || !colEthnicity || !colReligion || !colIdNumber || !colIdIssueDate || !colIdIssuePlace) {
+      return ApiResponse.badRequest(res, 'File Excel thiếu các cột bắt buộc: Mã SV, Họ tên, Email, Ngày sinh, Giới tính, Dân tộc, Tôn giáo, Số CCCD, Ngày cấp, Nơi cấp');
     }
 
     let successCount = 0;
@@ -442,6 +545,38 @@ const importStudents = async (req, res) => {
       return null;
     };
 
+<<<<<<< Updated upstream
+=======
+    // [FIX BUG-003] Detect trùng lặp ngay trong file trước khi query DB
+    // Tránh trường hợp 2 dòng cùng mã SV/email trong 1 file gây lỗi DB
+    const seenCodes  = new Set();
+    const seenEmails = new Set();
+
+    // [FIX TASK-10] Batch pre-fetch danh sách SV đã tồn tại trong DB (thay vì N+1 queries)
+    // Đọc sơ bộ tất cả student_code và email từ file trước
+    const allCodesInFile = [];
+    const allEmailsInFile = [];
+    for (let r = 2; r <= worksheet.rowCount; r++) {
+      const _row = worksheet.getRow(r);
+      const _code = _row.getCell(colCode).value?.toString().trim();
+      const _email = _row.getCell(colEmail).value?.toString().trim();
+      if (_code) allCodesInFile.push(_code);
+      if (_email) allEmailsInFile.push(_email);
+    }
+    // Query 1 lần lấy tất cả match
+    const existingInDB = allCodesInFile.length > 0 || allEmailsInFile.length > 0
+      ? await query(
+          `SELECT student_code, email FROM students WHERE
+           student_code IN (${allCodesInFile.length > 0 ? allCodesInFile.map(() => '?').join(',') : "''"})
+           OR email IN (${allEmailsInFile.length > 0 ? allEmailsInFile.map(() => '?').join(',') : "''"})`,
+          [...allCodesInFile, ...allEmailsInFile]
+        )
+      : [];
+    const dbCodeSet  = new Set(existingInDB.map(s => s.student_code?.toLowerCase()).filter(Boolean));
+    const dbEmailSet = new Set(existingInDB.map(s => s.email?.toLowerCase()).filter(Boolean));
+
+
+>>>>>>> Stashed changes
     // Iterate through rows starting from row 2
     for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
       const row = worksheet.getRow(rowNumber);
@@ -456,35 +591,116 @@ const importStudents = async (req, res) => {
         continue;
       }
 
+<<<<<<< Updated upstream
       // Check existence
       const existing = await queryOne('SELECT id FROM students WHERE student_code = ?', [student_code]);
       if (existing) {
+=======
+      // [FIX BUG-003] Kiểm tra trùng lặp trong cùng file (batch check)
+      if (seenCodes.has(student_code.toLowerCase())) {
+        errors.push(`Dòng ${rowNumber}: Mã SV "${student_code}" bị trùng lặp trong file (Bỏ qua)`);
+        continue;
+      }
+      if (seenEmails.has(email.toLowerCase())) {
+        errors.push(`Dòng ${rowNumber}: Email "${email}" bị trùng lặp trong file (Bỏ qua)`);
+        continue;
+      }
+      seenCodes.add(student_code.toLowerCase());
+      seenEmails.add(email.toLowerCase());
+
+      // [FIX TASK-10] Dùng dbCodeSet/dbEmailSet từ batch query, không gọi DB riêng lặ
+      if (dbCodeSet.has(student_code.toLowerCase())) {
+>>>>>>> Stashed changes
         errors.push(`Dòng ${rowNumber}: Sinh viên ${student_code} đã tồn tại (Bỏ qua)`);
         continue;
       }
 
+<<<<<<< Updated upstream
+=======
+      if (dbEmailSet.has(email.toLowerCase())) {
+        errors.push(`Dòng ${rowNumber}: Email ${email} đã được sử dụng (Bỏ qua)`);
+        continue;
+      }
+
+>>>>>>> Stashed changes
       const gender = colGender ? (row.getCell(colGender).value?.toString().trim() || 'Nam') : 'Nam';
       const date_of_birth = colDob ? parseDate(row.getCell(colDob).value) : null;
-      const phone = colPhone ? row.getCell(colPhone).value?.toString().trim() : null;
+      const ethnicity = colEthnicity ? row.getCell(colEthnicity).value?.toString().trim() : null;
+      const religion = colReligion ? row.getCell(colReligion).value?.toString().trim() : null;
+      const id_number = colIdNumber ? row.getCell(colIdNumber).value?.toString().trim() : null;
+      const id_issue_date = colIdIssueDate ? parseDate(row.getCell(colIdIssueDate).value) : null;
+      const id_issue_place = colIdIssuePlace ? row.getCell(colIdIssuePlace).value?.toString().trim() : null;
+
+      if (!date_of_birth || !gender || !ethnicity || !religion || !id_number || !id_issue_date || !id_issue_place) {
+        errors.push(`Dòng ${rowNumber}: Thiếu thông tin bắt buộc (Ngày sinh, Giới tính, Dân tộc, Tôn giáo, Số CCCD, Ngày cấp, Nơi cấp)`);
+        continue;
+      }
+
+      const phone = colPhone ? (row.getCell(colPhone).value?.toString().trim() || null) : null;
       
       const classVal = colClass ? row.getCell(colClass).value?.toString().trim().toLowerCase() : null;
-      const class_id = classVal ? classMap[classVal] : null;
+      const class_id = classVal ? (classMap[classVal] || null) : null;
 
       const majorVal = colMajor ? row.getCell(colMajor).value?.toString().trim().toLowerCase() : null;
-      const major_id = majorVal ? majorMap[majorVal] : null;
+      const major_id = majorVal ? (majorMap[majorVal] || null) : null;
 
       const deptVal = colDept ? row.getCell(colDept).value?.toString().trim().toLowerCase() : null;
-      const department_id = deptVal ? deptMap[deptVal] : null;
+      const department_id = deptVal ? (deptMap[deptVal] || null) : null;
 
       const training_system = colSystem ? (row.getCell(colSystem).value?.toString().trim() || 'Chính quy') : 'Chính quy';
       
+<<<<<<< Updated upstream
       const cohortVal = colCohort ? row.getCell(colCohort).value?.toString().trim().toLowerCase() : null;
       const cohort_id = cohortVal ? cohortMap[cohortVal] : null;
+=======
+      const cohortVal = colCohort ? row.getCell(colCohort).value?.toString().trim() : null;
+      let import_cohort_id = null;
+      if (cohortVal) {
+        if (cohortMap[cohortVal.toLowerCase()]) {
+          import_cohort_id = cohortMap[cohortVal.toLowerCase()];
+        } else {
+          import_cohort_id = await resolveCohortId(cohortVal);
+          const newCohort = await queryOne('SELECT * FROM cohorts WHERE id = ?', [import_cohort_id]);
+          if(newCohort) {
+             cohorts.push(newCohort);
+             cohortMap[cohortVal.toLowerCase()] = import_cohort_id;
+             if(newCohort.code) cohortMap[newCohort.code.toLowerCase()] = import_cohort_id;
+          }
+        }
+      }
+
+      // [FIX] Kiểm tra tính hợp lệ giữa Khóa học, Mã lớp, Mã sinh viên khi Import
+      let skipRow = false;
+      if (import_cohort_id) {
+        const cohortObj = cohorts.find(c => c.id === import_cohort_id);
+        if (cohortObj && cohortObj.code && cohortObj.code.toUpperCase().startsWith('K')) {
+          const suffix = cohortObj.code.toUpperCase().substring(1);
+          if (student_code && !(student_code.toUpperCase().startsWith('B' + suffix) || student_code.toUpperCase().startsWith('N' + suffix))) {
+            errors.push(`Dòng ${rowNumber}: Mã SV phải bắt đầu bằng B${suffix} hoặc N${suffix} đối với ${cohortObj.code}`);
+            skipRow = true;
+          }
+          if (!skipRow && class_id) {
+            const classObj = classes.find(c => c.id === class_id);
+            if (classObj && classObj.class_code && !classObj.class_code.toUpperCase().startsWith('D' + suffix)) {
+              errors.push(`Dòng ${rowNumber}: Mã lớp phải bắt đầu bằng D${suffix} đối với ${cohortObj.code}`);
+              skipRow = true;
+            }
+          }
+        }
+      }
+      
+      if (skipRow) continue;
+>>>>>>> Stashed changes
 
       try {
         await transaction(async (connection) => {
           const salt = await bcrypt.genSalt(10);
+<<<<<<< Updated upstream
           const hashedPassword = await bcrypt.hash('123456', salt);
+=======
+          const defaultPassword = '123456';
+          const hashedPassword = await bcrypt.hash(defaultPassword, salt);
+>>>>>>> Stashed changes
 
           const [userResult] = await connection.execute(
             'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
@@ -494,11 +710,15 @@ const importStudents = async (req, res) => {
           await connection.execute(
             `INSERT INTO students (
               user_id, student_code, full_name, date_of_birth, gender, email, phone,
+              ethnicity, religion, id_number, id_issue_date, id_issue_place,
               department_id, major_id, class_id, cohort_id, training_system, status, enrollment_date
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               userResult.insertId, student_code, full_name, date_of_birth, gender, email, phone,
-              department_id, major_id, class_id, cohort_id, training_system, 'Đang học', new Date()
+              ethnicity, religion, id_number, id_issue_date, id_issue_place,
+              department_id, major_id, class_id, import_cohort_id, training_system,
+              'Chờ duyệt',  // [FIX TASK-16] Nhất quán với flow phê duyệt thủ công
+              new Date()
             ]
           );
 

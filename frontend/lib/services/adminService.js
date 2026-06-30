@@ -175,9 +175,7 @@ export var settingService = {
   updateProfile: function (data) {
     return apiClient.put('/admin/settings/profile', data);
   },
-  changePassword: function (data) {
-    return apiClient.put('/admin/settings/password', data);
-  },
+
   updateNotifications: function (data) {
     return apiClient.put('/admin/settings/notifications', data);
   },
@@ -205,6 +203,15 @@ export var adminTuitionService = {
   },
   updateStatus: function (id, data) {
     return apiClient.put('/admin/tuitions/' + id + '/status', data);
+  },
+  create: function (data) {
+    return apiClient.post('/admin/tuitions', data);
+  },
+  getRegisteredCredits: function (studentId, params) {
+    return apiClient.get('/admin/tuitions/registered-credits/' + studentId, params || {});
+  },
+  delete: function (id) {
+    return apiClient.delete('/admin/tuitions/' + id);
   },
 };
 

@@ -11,7 +11,7 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata = {
   title: 'PTIT - Hệ thống quản lý thông tin sinh viên',
-  description: 'Cổng thông tin học vụ - Học viện Công nghệ Bưu chính Viễn thông',
+  description: 'Cổng thông tin sinh viên - Học viện Công nghệ Bưu chính Viễn thông',
   generator: 'v0.app',
   icons: {
     icon: [

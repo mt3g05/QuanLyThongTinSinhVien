@@ -32,6 +32,8 @@ export default function StudentsPage() {
   const [editingId, setEditingId] = useState(null)
   const [formData, setFormData] = useState({
     student_code: "", full_name: "", email: "", phone: "",
+    date_of_birth: "", gender: "Nam", ethnicity: "Kinh", religion: "Không", 
+    id_number: "", id_issue_date: "", id_issue_place: "",
     department_id: "", major_id: "", class_id: "", cohort_id: "", status: "Chờ duyệt"
   })
 
@@ -92,6 +94,8 @@ export default function StudentsPage() {
     setEditingId(null)
     setFormData({
       student_code: "", full_name: "", email: "", phone: "",
+      date_of_birth: "", gender: "Nam", ethnicity: "Kinh", religion: "Không", 
+      id_number: "", id_issue_date: "", id_issue_place: "",
       department_id: "", major_id: "", class_id: "", cohort_id: "", status: "Chờ duyệt"
     })
     setShowModal(true)
@@ -105,7 +109,11 @@ export default function StudentsPage() {
     setEditingId(s.id)
     setFormData({
       student_code: s.student_code, full_name: s.full_name, email: s.email, phone: s.phone || "",
-      department_id: s.department_id || "", major_id: s.major_id || "", class_id: s.class_id || "", cohort_id: s.cohort_id || "", status: s.status
+      date_of_birth: s.date_of_birth ? s.date_of_birth.split('T')[0] : "", gender: s.gender || "Nam",
+      ethnicity: s.ethnicity || "", religion: s.religion || "", 
+      id_number: s.id_number || "", id_issue_date: s.id_issue_date ? s.id_issue_date.split('T')[0] : "", 
+      id_issue_place: s.id_issue_place || "",
+      department_id: s.department_id || "", major_id: s.major_id || "", class_id: s.class_id || "", cohort_id: s.cohort_code || s.cohort_id || "", status: s.status
     })
     setShowModal(true)
   }
@@ -123,6 +131,30 @@ export default function StudentsPage() {
       "Ngày nhập học": s.enrollment_date ? new Date(s.enrollment_date).toLocaleDateString("vi-VN") : ""
     }))
     exportToCSV(exportData, "Danh_sach_sinh_vien.csv")
+  }
+
+  const downloadTemplate = () => {
+    const templateData = [
+      {
+        "Mã SV": "B24DCCN001",
+        "Họ tên": "Nguyễn Văn A",
+        "Email": "b24dccn001@ptit.edu.vn",
+        "Ngày sinh": "2006-01-01",
+        "Giới tính": "Nam",
+        "Dân tộc": "Kinh",
+        "Tôn giáo": "Không",
+        "Số CCCD": "012345678901",
+        "Ngày cấp": "2021-01-01",
+        "Nơi cấp": "Cục CSQLHC về TTXH",
+        "SĐT": "0987654321",
+        "Mã Lớp": "D24CQCN01-B",
+        "Mã Ngành": "DCCN",
+        "Mã Khoa": "CNTT",
+        "Hệ đào tạo": "Chính quy",
+        "Khóa": "K24"
+      }
+    ]
+    exportToCSV(templateData, "Mau_nhap_sinh_vien.csv")
   }
 
   const handleImport = async (e) => {
@@ -450,6 +482,11 @@ export default function StudentsPage() {
                   <p style={{ margin: "4px 0", fontSize: 14 }}><strong style={{ display: "inline-block", width: "120px" }}>Họ và tên:</strong> {viewingStudent.full_name}</p>
                   <p style={{ margin: "4px 0", fontSize: 14 }}><strong style={{ display: "inline-block", width: "120px" }}>Giới tính:</strong> {viewingStudent.gender || "Nam"}</p>
                   <p style={{ margin: "4px 0", fontSize: 14 }}><strong style={{ display: "inline-block", width: "120px" }}>Ngày sinh:</strong> {viewingStudent.date_of_birth ? new Date(viewingStudent.date_of_birth).toLocaleDateString("vi-VN") : "—"}</p>
+                  <p style={{ margin: "4px 0", fontSize: 14 }}><strong style={{ display: "inline-block", width: "120px" }}>Dân tộc:</strong> {viewingStudent.ethnicity || "—"}</p>
+                  <p style={{ margin: "4px 0", fontSize: 14 }}><strong style={{ display: "inline-block", width: "120px" }}>Tôn giáo:</strong> {viewingStudent.religion || "—"}</p>
+                  <p style={{ margin: "4px 0", fontSize: 14 }}><strong style={{ display: "inline-block", width: "120px" }}>Số CCCD:</strong> {viewingStudent.id_number || "—"}</p>
+                  <p style={{ margin: "4px 0", fontSize: 14 }}><strong style={{ display: "inline-block", width: "120px" }}>Ngày cấp:</strong> {viewingStudent.id_issue_date ? new Date(viewingStudent.id_issue_date).toLocaleDateString("vi-VN") : "—"}</p>
+                  <p style={{ margin: "4px 0", fontSize: 14 }}><strong style={{ display: "inline-block", width: "120px" }}>Nơi cấp:</strong> {viewingStudent.id_issue_place || "—"}</p>
                   <p style={{ margin: "4px 0", fontSize: 14 }}><strong style={{ display: "inline-block", width: "120px" }}>Số điện thoại:</strong> {viewingStudent.phone || "—"}</p>
                   <p style={{ margin: "4px 0", fontSize: 14 }}><strong style={{ display: "inline-block", width: "120px" }}>Email:</strong> {viewingStudent.email || "—"}</p>
                 </div>
@@ -485,6 +522,37 @@ export default function StudentsPage() {
                     <input className="form-input" required value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} />
                   </div>
                   <div>
+                    <label style={{ display: "block", marginBottom: 4, fontSize: 14 }}>Ngày sinh *</label>
+                    <input type="date" className="form-input" required value={formData.date_of_birth} onChange={e => setFormData({...formData, date_of_birth: e.target.value})} />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: 4, fontSize: 14 }}>Giới tính *</label>
+                    <select className="form-input" required value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})}>
+                      <option value="Nam">Nam</option>
+                      <option value="Nữ">Nữ</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: 4, fontSize: 14 }}>Dân tộc *</label>
+                    <input className="form-input" required value={formData.ethnicity} onChange={e => setFormData({...formData, ethnicity: e.target.value})} />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: 4, fontSize: 14 }}>Tôn giáo *</label>
+                    <input className="form-input" required value={formData.religion} onChange={e => setFormData({...formData, religion: e.target.value})} />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: 4, fontSize: 14 }}>Số CCCD *</label>
+                    <input className="form-input" required value={formData.id_number} onChange={e => setFormData({...formData, id_number: e.target.value})} />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: 4, fontSize: 14 }}>Ngày cấp CCCD *</label>
+                    <input type="date" className="form-input" required value={formData.id_issue_date} onChange={e => setFormData({...formData, id_issue_date: e.target.value})} />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: 4, fontSize: 14 }}>Nơi cấp CCCD *</label>
+                    <input className="form-input" required value={formData.id_issue_place} onChange={e => setFormData({...formData, id_issue_place: e.target.value})} />
+                  </div>
+                  <div>
                     <label style={{ display: "block", marginBottom: 4, fontSize: 14 }}>Email</label>
                     <input type="email" className="form-input" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                   </div>
@@ -517,10 +585,16 @@ export default function StudentsPage() {
                   </div>
                   <div>
                     <label style={{ display: "block", marginBottom: 4, fontSize: 14 }}>Khóa học</label>
-                    <select className="form-input" value={formData.cohort_id} onChange={e => setFormData({...formData, cohort_id: e.target.value})}>
-                      <option value="">-- Chọn Khóa --</option>
-                      {(cohorts || []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
+                    <input 
+                      className="form-input" 
+                      list="cohorts-list"
+                      placeholder="Chọn hoặc nhập Khóa (Vd: K24)"
+                      value={formData.cohort_id} 
+                      onChange={e => setFormData({...formData, cohort_id: e.target.value})}
+                    />
+                    <datalist id="cohorts-list">
+                      {(cohorts || []).map(c => <option key={c.id} value={c.code || c.name}>{c.name}</option>)}
+                    </datalist>
                   </div>
                   <div>
                     <label style={{ display: "block", marginBottom: 4, fontSize: 14 }}>Trạng thái</label>
@@ -553,9 +627,14 @@ export default function StudentsPage() {
                 <form onSubmit={handleImport}>
                   <div style={{ marginBottom: 16 }}>
                     <p style={{ fontSize: 14, color: "var(--muted-foreground)", marginBottom: 16 }}>
-                      Vui lòng chuẩn bị file Excel (.xlsx) với các cột bắt buộc: <strong>Mã SV, Họ tên, Email</strong>.<br/>
-                      Các cột tùy chọn: Giới tính, Ngày sinh, SĐT, Mã Lớp, Mã Ngành, Mã Khoa, Hệ đào tạo, Khóa.
+                      Vui lòng chuẩn bị file Excel (.xlsx, .csv) với các cột bắt buộc: <strong>Mã SV, Họ tên, Email, Ngày sinh, Giới tính, Dân tộc, Tôn giáo, Số CCCD, Ngày cấp, Nơi cấp</strong>.<br/>
+                      Các cột tùy chọn: SĐT, Mã Lớp, Mã Ngành, Mã Khoa, Hệ đào tạo, Khóa.
                     </p>
+                    <div style={{ marginBottom: 16 }}>
+                      <button type="button" className="btn btn-outline btn-sm" onClick={downloadTemplate}>
+                        <Download size={14} style={{ marginRight: 4 }} /> Tải file mẫu (.csv)
+                      </button>
+                    </div>
                     <input 
                       type="file" 
                       accept=".xlsx, .xls" 

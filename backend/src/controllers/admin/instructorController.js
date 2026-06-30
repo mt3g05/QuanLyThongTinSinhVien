@@ -120,6 +120,7 @@ const createInstructor = async (req, res) => {
       return ApiResponse.badRequest(res, 'Mã giảng viên đã tồn tại');
     }
 
+<<<<<<< Updated upstream
     const result = await insert(
       `INSERT INTO instructors (
         instructor_code, full_name, email, phone,
@@ -135,6 +136,40 @@ const createInstructor = async (req, res) => {
         status || 'Đang dạy'
       ]
     );
+=======
+    const result = await transaction(async (connection) => {
+      // 1. Create user account
+      const salt = await bcrypt.genSalt(10);
+      const defaultPassword = '123456';
+      const hashedPassword = await bcrypt.hash(defaultPassword, salt);
+      
+      const [userResult] = await connection.execute(
+        'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+        [instructor_code, hashedPassword, 'instructor']
+      );
+      
+      const userId = userResult.insertId;
+
+      // 2. Create instructor
+      const [instructorResult] = await connection.execute(
+        `INSERT INTO instructors (
+          user_id, instructor_code, full_name, email, phone,
+          department_id, academic_rank, degree, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          userId, instructor_code, full_name,
+          email || `${instructor_code.toLowerCase()}@ptit.edu.vn`,
+          phone || null,
+          department_id || null,
+          academic_rank || null,
+          degree || 'Thạc sĩ',
+          status || 'Đang dạy'
+        ]
+      );
+      
+      return instructorResult.insertId;
+    });
+>>>>>>> Stashed changes
 
     return ApiResponse.created(res, {
       id: result.insertId,
@@ -218,7 +253,24 @@ const deleteInstructor = async (req, res) => {
       return ApiResponse.badRequest(res, 'Không thể xóa giảng viên đang có môn học hoạt động');
     }
 
-    await insert('DELETE FROM instructors WHERE id = ?', [id]);
+    // [FIX TASK-08] Dùng transaction: xóa instructor + user account liên kết
+    await transaction(async (connection) => {
+      // Lấy user_id trước khi xóa
+      const instructorFull = await queryOne('SELECT user_id FROM instructors WHERE id = ?', [id]);
+
+      // Xóa instructor record
+      await connection.execute('DELETE FROM instructors WHERE id = ?', [id]);
+
+      // Xóa user account nếu có
+      if (instructorFull?.user_id) {
+        // Xóa notification_reads liên quan trước (tránh FK)
+        await connection.execute(
+          'DELETE FROM notification_reads WHERE user_id = ?',
+          [instructorFull.user_id]
+        );
+        await connection.execute('DELETE FROM users WHERE id = ?', [instructorFull.user_id]);
+      }
+    });
 
     return ApiResponse.success(res, null, 'Xóa giảng viên thành công');
   } catch (error) {

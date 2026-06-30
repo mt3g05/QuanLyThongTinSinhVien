@@ -218,6 +218,19 @@ export default function TuitionPage() {
                 </div>
               )}
             </div>
+<<<<<<< Updated upstream
+=======
+            </div>
+            
+            <div className="card" style={{ padding: '1.5rem', background: 'rgba(14, 165, 233, 0.05)', border: '1px solid rgba(14, 165, 233, 0.2)', textAlign: 'center' }}>
+               <h3 style={{ color: '#0284c7', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                 <AlertCircle size={20} /> Hướng dẫn thanh toán
+               </h3>
+               <p style={{ color: 'var(--muted-foreground)' }}>
+                 Để xem chi tiết hóa đơn và các phương thức thanh toán, vui lòng chọn một <strong>Học kỳ cụ thể</strong> ở bộ lọc phía trên.
+               </p>
+            </div>
+>>>>>>> Stashed changes
           </div>
         ) : (
           /* ================= SPECIFIC SEMESTER VIEW ================= */
@@ -296,8 +309,8 @@ export default function TuitionPage() {
               </div>
             </div>
 
-            {/* Payment Section (only show if remaining > 0) */}
-            {specificTuition && Number(specificTuition.remaining) > 0 && (
+            {/* Payment Section (only show if remaining > 0 and not pending) */}
+            {specificTuition && Number(specificTuition.remaining) > 0 && specificTuition.status === 'Chưa thanh toán' && (
               <div className="card" style={{ border: '2px solid var(--primary)', overflow: 'hidden' }}>
                 <div className="card-header" style={{ background: 'rgba(185, 28, 28, 0.05)' }}>
                   <h2 className="card-title text-primary"><Wallet /> Thanh toán khoản nợ</h2>
@@ -358,8 +371,21 @@ export default function TuitionPage() {
                     disabled={paying}
                   >
                     <Wallet />
-                    {paying ? "Đang xử lý..." : "Xác nhận thanh toán " + formatCurrency(specificTuition.remaining)}
+                    {paying ? "Đang xử lý..." : "Xác nhận đã nộp " + formatCurrency(specificTuition.remaining)}
                   </button>
+                </div>
+              </div>
+            )}
+            
+            {/* Pending Confirmation Section */}
+            {specificTuition && specificTuition.status === 'Chờ xác nhận' && (
+              <div className="card" style={{ border: '2px solid #eab308', overflow: 'hidden' }}>
+                <div className="card-header" style={{ background: 'rgba(234, 179, 8, 0.1)' }}>
+                  <h2 className="card-title" style={{ color: '#ca8a04' }}><Clock /> Đang chờ xác nhận</h2>
+                </div>
+                <div className="card-content" style={{ padding: '2rem', textAlign: 'center' }}>
+                  <p style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>Bạn đã gửi yêu cầu xác nhận đã nộp tiền.</p>
+                  <p style={{ color: 'var(--muted-foreground)' }}>Vui lòng chờ nhà trường (Admin) kiểm tra và cập nhật trạng thái hóa đơn.</p>
                 </div>
               </div>
             )}

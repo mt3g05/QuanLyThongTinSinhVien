@@ -1,5 +1,5 @@
 // src/controllers/admin/classController.js
-const { query, queryOne, insert } = require('../../config/database');
+const { query, queryOne, insert, transaction } = require('../../config/database');
 const ApiResponse = require('../../utils/apiResponse');
 const { getPagination, getPagingData } = require('../../utils/pagination');
 
@@ -233,10 +233,18 @@ const deleteClass = async (req, res) => {
       return ApiResponse.badRequest(res, 'Không thể xóa lớp học đang có sinh viên');
     }
 
-    // Xóa các lịch học liên quan đến lớp này trước để tránh lỗi khóa ngoại (foreign key)
-    await insert('DELETE FROM schedules WHERE class_id = ?', [id]);
-
-    await insert('DELETE FROM classes WHERE id = ?', [id]);
+    // [FIX TASK-12] Dùng transaction: xóa registrations → schedules → classes (đúng thứ tự FK)
+    await transaction(async (connection) => {
+      // 1. Xóa registrations liên quan đến schedules của lớp này trước
+      await connection.execute(
+        'DELETE FROM registrations WHERE schedule_id IN (SELECT id FROM schedules WHERE class_id = ?)',
+        [id]
+      );
+      // 2. Xóa schedules
+      await connection.execute('DELETE FROM schedules WHERE class_id = ?', [id]);
+      // 3. Xóa class
+      await connection.execute('DELETE FROM classes WHERE id = ?', [id]);
+    });
 
     return ApiResponse.success(res, null, 'Xóa lớp học thành công');
   } catch (error) {

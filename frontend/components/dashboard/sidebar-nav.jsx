@@ -41,6 +41,7 @@ const adminNavItems = [
 const studentNavItems = [
   { title: "Tổng quan", href: "/student", icon: Home },
   { title: "Thông tin cá nhân", href: "/student/profile", icon: User },
+  { title: "Đăng ký học phần", href: "/student/courses", icon: BookOpen },
   { title: "Kết quả học tập", href: "/student/grades", icon: FileText },
   { title: "Học phí", href: "/student/tuition", icon: CreditCard },
   { title: "Thông báo", href: "/student/notifications", icon: Bell },

@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import { Header } from "@/components/dashboard/header"
 import { useApi, useMutation } from "@/hooks/use-api"
 import { settingService } from "@/lib/services/adminService"
+import authService from "@/lib/services/authService"
 import {
   Settings, User, Bell, Shield, Database,
   Globe, Save, Key, Users, CheckCircle,
@@ -28,6 +29,7 @@ export default function SettingsPage() {
     current_semester: "",
     language: "vi",
     timezone: "Asia/Ho_Chi_Minh",
+    credit_price: "",
   })
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [passwordForm, setPasswordForm] = useState({
@@ -58,6 +60,7 @@ export default function SettingsPage() {
         current_semester: settings.current_semester || "",
         language: settings.language || "vi",
         timezone: settings.timezone || "Asia/Ho_Chi_Minh",
+        credit_price: settings.credit_price || "",
       })
       setProfileForm({
         full_name: settings.admin_name || "",
@@ -84,7 +87,7 @@ export default function SettingsPage() {
   )
 
   const { mutate: changePassword, loading: changingPassword } = useMutation(
-    settingService.changePassword,
+    authService.changePassword,
     {
       onSuccess: function () {
         showSuccess("Đổi mật khẩu thành công")
@@ -159,7 +162,7 @@ export default function SettingsPage() {
       showError("Mật khẩu mới phải có ít nhất 6 ký tự")
       return
     }
-    changePassword({ old_password: passwordForm.old_password, new_password: passwordForm.new_password })
+    changePassword(passwordForm.old_password, passwordForm.new_password, passwordForm.confirm_password)
   }
 
   function handleSaveProfile(e) {
@@ -323,6 +326,20 @@ export default function SettingsPage() {
                           })
                         }}
                         placeholder="VD: HK2 (2024-2025)"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Giá 1 tín chỉ (VNĐ)</label>
+                      <input
+                        type="number"
+                        className="form-input"
+                        value={generalForm.credit_price}
+                        onChange={function (e) {
+                          setGeneralForm(function (prev) {
+                            return Object.assign({}, prev, { credit_price: e.target.value })
+                          })
+                        }}
+                        placeholder="VD: 450000"
                       />
                     </div>
                     <div className="form-row">

@@ -123,6 +123,7 @@ const getBankInfo = async (req, res) => {
       [studentId]
     );
 
+    // [LOW TASK-14] TODO: Lấy thông tin tài khoản ngân hàng từ bảng settings
     return ApiResponse.success(res, {
       bankName: 'Vietcombank - Chi nhánh Hà Nội',
       accountNumber: '1234567890123',
@@ -142,6 +143,14 @@ const processPayment = async (req, res) => {
     const { tuition_id, payment_method } = req.body;
     const studentId = await getStudentId(req.user.id);
 
+    if (!studentId) {
+      return ApiResponse.notFound(res, 'Không tìm thấy thông tin sinh viên');
+    }
+
+    if (!tuition_id || !payment_method) {
+      return ApiResponse.badRequest(res, 'Thiếu thông tin thanh toán');
+    }
+
     const tuition = await queryOne(
       'SELECT * FROM tuitions WHERE id = ? AND student_id = ?',
       [tuition_id, studentId]
@@ -155,19 +164,16 @@ const processPayment = async (req, res) => {
       return ApiResponse.badRequest(res, 'Học phí đã được thanh toán');
     }
 
-    // In production, this would integrate with payment gateway
     await insert(
       `UPDATE tuitions SET 
-        status = 'Đã thanh toán', 
-        paid_amount = total_amount,
-        remaining = 0,
+        status = 'Chờ xác nhận',
         payment_method = ?,
         payment_date = NOW()
        WHERE id = ?`,
       [payment_method, tuition_id]
     );
 
-    return ApiResponse.success(res, null, 'Thanh toán học phí thành công');
+    return ApiResponse.success(res, null, 'Đã gửi xác nhận thanh toán. Vui lòng chờ nhà trường duyệt.');
   } catch (error) {
     console.error('Process payment error:', error);
     return ApiResponse.error(res, 'Lỗi khi thanh toán');

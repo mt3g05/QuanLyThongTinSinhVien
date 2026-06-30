@@ -134,7 +134,7 @@ export default function LoginPage() {
             </div>
             
             <h1 className="login-title">
-              Cổng thông tin<br />học vụ
+              Cổng thông tin<br />sinh viên
             </h1>
             
             <p className="login-description">

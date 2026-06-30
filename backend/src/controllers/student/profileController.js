@@ -179,7 +179,18 @@ const updateAvatar = async (req, res) => {
 
     const avatarPath = `/uploads/avatars/${req.file.filename}`;
 
+<<<<<<< Updated upstream
     await insert('UPDATE students SET avatar = ? WHERE id = ?', [avatarPath, studentId]);
+=======
+    // [FIX BUG-023] Xóa file avatar cũ để tránh rò rỉ storage
+    if (oldStudent?.avatar && !oldStudent.avatar.includes('default')) {
+      const relativeAvatar = oldStudent.avatar.replace(/^\//, '');
+      const oldFilePath = path.join(__dirname, '../../../', relativeAvatar);
+      if (fs.existsSync(oldFilePath)) {
+        try { fs.unlinkSync(oldFilePath); } catch { /* bỏ qua nếu xóa thất bại */ }
+      }
+    }
+>>>>>>> Stashed changes
 
     return ApiResponse.success(res, { avatar: avatarPath }, 'Cập nhật ảnh đại diện thành công');
   } catch (error) {

@@ -602,10 +602,16 @@ export default function ClassesPage() {
                   </div>
                   <div>
                     <label style={{ display: "block", marginBottom: 4, fontSize: 14 }}>Khóa (Năm học)</label>
-                    <select className="form-input" value={formData.academic_year} onChange={e => setFormData({...formData, academic_year: e.target.value})}>
-                      <option value="">-- Chọn Khóa --</option>
+                    <input 
+                      className="form-input" 
+                      list="class-cohorts-list"
+                      placeholder="Chọn hoặc nhập Khóa (Vd: K24)"
+                      value={formData.academic_year} 
+                      onChange={e => setFormData({...formData, academic_year: e.target.value})}
+                    />
+                    <datalist id="class-cohorts-list">
                       {cohorts.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                    </select>
+                    </datalist>
                   </div>
                   <div>
                     <label style={{ display: "block", marginBottom: 4, fontSize: 14 }}>Trạng thái</label>

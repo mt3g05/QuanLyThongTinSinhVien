@@ -1,10 +1,10 @@
 // src/utils/constants.js
 
 module.exports = {
-  // User roles
   ROLES: {
     ADMIN: 'admin',
-    STUDENT: 'student'
+    STUDENT: 'student',
+    INSTRUCTOR: 'instructor'
   },
 
   // Student status
@@ -71,11 +71,13 @@ module.exports = {
   GRADE_SCALE: [
     { min: 9.0, max: 10, letter: 'A+', gpa: 4.0 },
     { min: 8.5, max: 8.9, letter: 'A', gpa: 3.7 },
-    { min: 7.0, max: 8.4, letter: 'B+', gpa: 3.3 },
-    { min: 6.5, max: 6.9, letter: 'B', gpa: 3.0 },
-    { min: 5.5, max: 6.4, letter: 'C+', gpa: 2.3 },
-    { min: 4.0, max: 5.4, letter: 'D', gpa: 1.0 },
-    { min: 0, max: 3.9, letter: 'F', gpa: 0 }
+    { min: 8.0, max: 8.4, letter: 'B+', gpa: 3.5 },
+    { min: 7.0, max: 7.9, letter: 'B', gpa: 3.0 },
+    { min: 6.5, max: 6.9, letter: 'C+', gpa: 2.5 },
+    { min: 6.0, max: 6.4, letter: 'C', gpa: 2.0 },
+    { min: 5.5, max: 5.9, letter: 'D+', gpa: 1.5 },
+    { min: 5.0, max: 5.4, letter: 'D', gpa: 1.0 },
+    { min: 0, max: 4.9, letter: 'F', gpa: 0 }
   ],
 
   // Schedule periods

@@ -121,7 +121,7 @@ export default function LoginPage() {
           </div>
 
           {/* Main Title */}
-          <h1 className="login-title">Cổng thông tin học vụ</h1>
+          <h1 className="login-title">Cổng thông tin sinh viên</h1>
           
           <p className="login-description">
             Nền tảng quản lý học vụ tập trung dành cho sinh viên, giảng viên và cán bộ quản lý của Học viện Công nghệ Bưu chính Viễn thông.

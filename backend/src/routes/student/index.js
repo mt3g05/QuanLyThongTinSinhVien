@@ -11,6 +11,7 @@ router.use(authorize('student'));
 router.use('/dashboard', require('./dashboardRoutes'));
 router.use('/profile', require('./profileRoutes'));
 router.use('/grades', require('./gradeRoutes'));
+router.use('/courses', require('./courseRoutes'));
 router.use('/tuition', require('./tuitionRoutes'));
 router.use('/notifications', require('./notificationRoutes'));
 

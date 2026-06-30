@@ -141,8 +141,94 @@ const updateTuitionStatus = async (req, res) => {
   }
 };
 
+// @desc    Create tuition invoice
+// @route   POST /api/admin/tuitions
+const createTuitionInvoice = async (req, res) => {
+  try {
+    const { student_id, semester, total_credits, credit_fee } = req.body;
+
+    if (!student_id || !semester || total_credits === undefined || total_credits === null || credit_fee === undefined || credit_fee === null) {
+      return ApiResponse.badRequest(res, 'Vui lòng cung cấp đầy đủ thông tin hóa đơn');
+    }
+
+    // Check if tuition already exists
+    const existing = await queryOne(
+      'SELECT id FROM tuitions WHERE student_id = ? AND semester = ?',
+      [student_id, semester]
+    );
+    if (existing) {
+      return ApiResponse.badRequest(res, 'Sinh viên đã có hóa đơn học phí trong học kỳ này');
+    }
+
+    const total_amount = total_credits * credit_fee;
+
+    const result = await insert(
+      `INSERT INTO tuitions (student_id, semester, total_credits, credit_fee, total_amount, remaining, status) 
+       VALUES (?, ?, ?, ?, ?, ?, 'Chưa thanh toán')`,
+      [student_id, semester, total_credits, credit_fee, total_amount, total_amount]
+    );
+
+    return ApiResponse.created(res, { id: result.insertId }, 'Tạo hóa đơn học phí thành công');
+  } catch (error) {
+    console.error('Create tuition invoice error:', error);
+    return ApiResponse.error(res, 'Lỗi khi tạo hóa đơn học phí');
+  }
+};
+
+// @desc    Get total registered credits for a student
+// @route   GET /api/admin/tuitions/registered-credits/:studentId
+const getRegisteredCredits = async (req, res) => {
+  try {
+    const studentId = req.params.studentId;
+    const { semester } = req.query;
+
+    // Semester is passed from client but we no longer filter by it
+    // if (!semester) {
+    //   return ApiResponse.badRequest(res, 'Vui lòng cung cấp học kỳ (semester)');
+    // }
+
+    const result = await query(
+      `SELECT SUM(c.credits) as total_credits
+       FROM registrations r
+       JOIN courses c ON r.course_id = c.id
+       WHERE r.student_id = ? AND r.status != 'Đã hủy'`,
+      [studentId]
+    );
+
+    const totalCredits = result[0].total_credits || 0;
+
+    return ApiResponse.success(res, { total_credits: totalCredits });
+  } catch (error) {
+    console.error('Get registered credits error:', error);
+    return ApiResponse.error(res, 'Lỗi khi tính tổng số tín chỉ đăng ký');
+  }
+};
+
+// @desc    Delete tuition invoice
+// @route   DELETE /api/admin/tuitions/:id
+const deleteTuitionInvoice = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const existing = await queryOne('SELECT id FROM tuitions WHERE id = ?', [id]);
+    if (!existing) {
+      return ApiResponse.notFound(res, 'Không tìm thấy hóa đơn học phí');
+    }
+
+    await query('DELETE FROM tuitions WHERE id = ?', [id]);
+    
+    return ApiResponse.success(res, null, 'Xóa hóa đơn thành công');
+  } catch (error) {
+    console.error('Delete tuition invoice error:', error);
+    return ApiResponse.error(res, 'Lỗi khi xóa hóa đơn học phí');
+  }
+};
+
 module.exports = {
   getAllTuitions,
   getTuitionStats,
-  updateTuitionStatus
+  updateTuitionStatus,
+  createTuitionInvoice,
+  getRegisteredCredits,
+  deleteTuitionInvoice
 };

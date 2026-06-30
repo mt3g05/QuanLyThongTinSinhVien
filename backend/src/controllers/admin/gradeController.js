@@ -217,9 +217,6 @@ const updateGrade = async (req, res) => {
         ]
       );
 
-      if (grade.status === 'Đã duyệt') {
-        await updateStudentGPA(grade.student_id, connection);
-      }
     });
 
     return ApiResponse.success(res, null, 'Cập nhật điểm thành công');

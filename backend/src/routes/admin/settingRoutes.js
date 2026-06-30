@@ -6,7 +6,7 @@ const settingController = require('../../controllers/admin/settingController');
 router.get('/', settingController.getSettings);
 router.put('/general', settingController.updateGeneral);
 router.put('/profile', settingController.updateProfile);
-router.put('/password', settingController.changePassword);
+
 router.put('/notifications', settingController.updateNotifications);
 router.get('/system-status', settingController.getSystemStatus);
 router.get('/sessions', settingController.getSessions);

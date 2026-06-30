@@ -6,16 +6,8 @@ const bcrypt = require('bcryptjs');
 // @desc    Get all settings
 // @route   GET /api/admin/settings
 
-// @desc    Change password
-// @route   PUT /api/admin/settings/password
-const changePassword = async (req, res) => {
-  try {
-    const { old_password, new_password } = req.body;
-    
-    if (!old_password || !new_password) {
-      return ApiResponse.badRequest(res, 'Vui lòng nhập đầy đủ thông tin');
-    }
 
+<<<<<<< Updated upstream
     const user = await queryOne('SELECT * FROM users WHERE id = ?', [req.user.id]);
     if (!user) {
       return ApiResponse.notFound(res, 'Không tìm thấy người dùng');
@@ -37,6 +29,8 @@ const changePassword = async (req, res) => {
     return ApiResponse.error(res, 'Lỗi khi đổi mật khẩu');
   }
 };
+=======
+>>>>>>> Stashed changes
 
 const getSettings = async (req, res) => {
   try {
@@ -59,13 +53,14 @@ const getSettings = async (req, res) => {
 // @route   PUT /api/admin/settings/general
 const updateGeneral = async (req, res) => {
   try {
-    const { system_name, current_semester, language, timezone } = req.body;
+    const { system_name, current_semester, language, timezone, credit_price } = req.body;
 
     const updates = [
       { key: 'system_name', value: system_name },
       { key: 'current_semester', value: current_semester },
       { key: 'language', value: language },
-      { key: 'timezone', value: timezone }
+      { key: 'timezone', value: timezone },
+      { key: 'credit_price', value: credit_price }
     ];
 
     for (const { key, value } of updates) {
@@ -76,6 +71,18 @@ const updateGeneral = async (req, res) => {
           [key, value, value]
         );
       }
+    }
+
+    // [FIX TASK-11] Đồng bộ current_semester sang bảng semesters
+    // (Trước đây có 2 nguồn sự thật: settings table vs semesters.is_current)
+    if (current_semester !== undefined) {
+      await insert('UPDATE semesters SET is_current = 0');
+      // Tìm semester theo code hoặc name
+      await insert(
+        `UPDATE semesters SET is_current = 1
+         WHERE code = ? OR name = ?`,
+        [current_semester, current_semester]
+      );
     }
 
     return ApiResponse.success(res, null, 'Cập nhật cài đặt chung thành công');
@@ -234,7 +241,6 @@ const backupDatabase = async (req, res) => {
 
 module.exports = {
   getSettings,
-  changePassword,
   updateGeneral,
   updateProfile,
   updateNotifications,
